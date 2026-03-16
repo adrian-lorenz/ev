@@ -85,18 +85,20 @@ heading "Verifying checksum…"
 
 cd "$TMP_DIR"
 
-if [ "$GOOS" = "darwin" ] && command -v shasum >/dev/null 2>&1; then
-  grep "$ARCHIVE" checksums.txt | shasum -a 256 --check --status \
-    || fatal "Checksum verification failed — the download may be corrupted or tampered with"
+EXPECTED=$(grep "  ${ARCHIVE}$" checksums.txt | awk '{print $1}')
+[ -z "$EXPECTED" ] && fatal "Could not find checksum for ${ARCHIVE} in checksums.txt"
+
+if command -v shasum >/dev/null 2>&1; then
+  ACTUAL=$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')
 elif command -v sha256sum >/dev/null 2>&1; then
-  grep "$ARCHIVE" checksums.txt | sha256sum --check --status \
-    || fatal "Checksum verification failed — the download may be corrupted or tampered with"
-elif command -v shasum >/dev/null 2>&1; then
-  grep "$ARCHIVE" checksums.txt | shasum -a 256 --check --status \
-    || fatal "Checksum verification failed — the download may be corrupted or tampered with"
+  ACTUAL=$(sha256sum "$ARCHIVE" | awk '{print $1}')
 else
   warn "No sha256sum or shasum found — skipping checksum verification"
+  ACTUAL="$EXPECTED"
 fi
+
+[ "$EXPECTED" = "$ACTUAL" ] \
+  || fatal "Checksum verification failed — the download may be corrupted or tampered with"
 
 info "Checksum OK"
 
