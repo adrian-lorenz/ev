@@ -1,0 +1,221 @@
+{{ define "page" }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>envault</title>
+  <script src="/static/htmx.min.js"></script>
+  <script src="/static/tailwind.min.js"></script>
+  <style>
+    [x-cloak] { display: none; }
+    input:focus { outline: none; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 h-screen flex overflow-hidden font-sans">
+
+  <!-- Sidebar -->
+  <aside class="w-56 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0">
+
+    <!-- Logo -->
+    <div class="px-4 py-5 border-b border-gray-800">
+      <div class="flex items-center gap-2">
+        <div class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_#22c55e]"></div>
+        <span class="font-bold text-white text-sm tracking-widest uppercase">envault</span>
+      </div>
+      <p class="text-xs text-gray-600 mt-1 pl-4">local secret manager</p>
+    </div>
+
+    <!-- Project list -->
+    <nav class="flex-1 overflow-y-auto py-2" id="project-list">
+      {{ template "project-list" .Projects }}
+    </nav>
+
+    <!-- Add project -->
+    <div class="p-3 border-t border-gray-800">
+      <form hx-post="/projects"
+            hx-target="#project-list"
+            hx-swap="innerHTML"
+            hx-on::after-request="this.reset()"
+            class="flex gap-1.5">
+        <input type="text" name="name" placeholder="new project…" required autocomplete="off"
+          class="flex-1 min-w-0 bg-gray-800 text-xs text-gray-200 px-2.5 py-1.5 rounded
+                 border border-gray-700 focus:border-green-600 placeholder-gray-600 transition-colors">
+        <button type="submit"
+          class="bg-gray-700 hover:bg-green-700 text-gray-300 hover:text-white text-sm font-bold
+                 px-2.5 py-1.5 rounded transition-colors">+</button>
+      </form>
+    </div>
+
+  </aside>
+
+  <!-- Main content -->
+  <main class="flex-1 overflow-y-auto bg-gray-950">
+    <div class="p-8" id="secret-area">
+      <div class="flex items-center gap-2 text-gray-700">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19l-7-7 7-7"/>
+        </svg>
+        <span class="text-sm">Select a project to view secrets</span>
+      </div>
+    </div>
+  </main>
+
+</body>
+</html>
+{{ end }}
+
+
+{{ define "project-list" }}
+{{ range . }}
+<div class="flex items-center group mx-2 my-0.5 rounded hover:bg-gray-800 transition-colors">
+  <button
+    hx-get="/projects/{{ . }}/secrets"
+    hx-target="#secret-area"
+    hx-swap="innerHTML"
+    class="flex-1 text-left px-3 py-2 text-xs text-gray-400 hover:text-white truncate transition-colors">
+    {{ . }}
+  </button>
+  <button
+    hx-delete="/projects/{{ . }}"
+    hx-target="#project-list"
+    hx-swap="innerHTML"
+    hx-confirm="Delete project '{{ . }}' and all its secrets?"
+    class="px-2 py-2 text-gray-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all text-xs shrink-0">
+    ✕
+  </button>
+</div>
+{{ end }}
+{{ end }}
+
+
+{{ define "secret-area" }}
+<!-- Header -->
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h2 class="text-base font-semibold text-white tracking-tight">{{ .Project }}</h2>
+    <p class="text-xs text-gray-600 mt-0.5">
+      {{ len .Secrets }} secret{{ if ne (len .Secrets) 1 }}s{{ end }}
+    </p>
+  </div>
+</div>
+
+<!-- Add secret form -->
+<form hx-post="/projects/{{ .Project }}/secrets"
+      hx-target="#secret-table-body"
+      hx-swap="innerHTML"
+      hx-on::after-request="this.reset()"
+      class="flex gap-2 mb-5">
+  <input type="text" name="key" placeholder="KEY" required autocomplete="off"
+    class="bg-gray-900 font-mono text-xs text-green-400 px-3 py-2 rounded border border-gray-700
+           focus:border-green-600 placeholder-gray-600 w-40 uppercase transition-colors">
+  <input type="text" name="value" placeholder="value" autocomplete="off"
+    class="flex-1 bg-gray-900 font-mono text-xs text-gray-300 px-3 py-2 rounded border border-gray-700
+           focus:border-green-600 placeholder-gray-600 transition-colors">
+  <button type="submit"
+    class="bg-green-800 hover:bg-green-700 text-white text-xs font-medium px-4 py-2 rounded transition-colors">
+    Add
+  </button>
+</form>
+
+<!-- Secrets table -->
+<div class="bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
+  <table class="w-full">
+    <thead>
+      <tr class="border-b border-gray-800">
+        <th class="text-left text-xs text-gray-600 font-medium px-4 py-2.5 w-52">KEY</th>
+        <th class="text-left text-xs text-gray-600 font-medium px-4 py-2.5">VALUE</th>
+        <th class="w-16"></th>
+      </tr>
+    </thead>
+    <tbody id="secret-table-body">
+      {{ template "secret-rows" . }}
+    </tbody>
+  </table>
+</div>
+{{ end }}
+
+
+{{ define "secret-rows" }}
+{{ if .Secrets }}
+{{ range .Secrets }}
+{{ template "secret-row" (dict "Project" $.Project "Key" .Key) }}
+{{ end }}
+{{ else }}
+<tr>
+  <td colspan="4" class="px-4 py-8 text-center text-xs text-gray-700">
+    No secrets yet. Add one above.
+  </td>
+</tr>
+{{ end }}
+{{ end }}
+
+
+{{ define "secret-row" }}
+<tr class="border-b border-gray-800 last:border-0 group hover:bg-gray-800/40 transition-colors"
+    id="secret-row-{{ .Key }}">
+  <td class="px-4 py-3 font-mono text-xs text-green-400 w-52 align-top pt-3.5">{{ .Key }}</td>
+  <td class="px-4 py-3 font-mono text-xs text-gray-500 align-top pt-3.5">
+    <span id="val-{{ .Key }}" class="select-none tracking-widest">••••••••</span>
+    <button
+      hx-get="/projects/{{ .Project }}/secrets/{{ .Key }}/reveal"
+      hx-target="#val-{{ .Key }}"
+      hx-swap="outerHTML"
+      class="ml-2 text-xs text-gray-700 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-all">
+      reveal
+    </button>
+  </td>
+  <td class="px-4 py-3 text-right align-top pt-2.5 whitespace-nowrap">
+    <button
+      hx-get="/projects/{{ .Project }}/secrets/{{ .Key }}/edit"
+      hx-target="#secret-row-{{ .Key }}"
+      hx-swap="outerHTML"
+      class="text-xs text-gray-700 hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-all mr-2">
+      edit
+    </button>
+    <button
+      hx-delete="/projects/{{ .Project }}/secrets/{{ .Key }}"
+      hx-target="closest tr"
+      hx-swap="delete"
+      hx-confirm="Delete {{ .Key }}?"
+      class="text-xs text-gray-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+      delete
+    </button>
+  </td>
+</tr>
+{{ end }}
+
+
+{{ define "edit-row" }}
+<tr class="border-b border-gray-800 bg-gray-800/60" id="secret-row-{{ .Key }}">
+  <td class="px-4 py-3 font-mono text-xs text-green-400 w-52 align-top pt-3.5">{{ .Key }}</td>
+  <td class="px-4 py-3 align-top" colspan="2">
+    <form hx-put="/projects/{{ .Project }}/secrets/{{ .Key }}"
+          hx-target="#secret-row-{{ .Key }}"
+          hx-swap="outerHTML"
+          class="flex flex-col gap-2">
+      <textarea name="value" rows="4" autocomplete="off" autofocus
+        class="w-full bg-gray-900 font-mono text-xs text-yellow-300 px-3 py-2 rounded border border-blue-600
+               focus:outline-none focus:border-blue-400 resize-y placeholder-gray-600 whitespace-pre">{{ .Value }}</textarea>
+      <div class="flex gap-2">
+        <button type="submit"
+          class="bg-blue-700 hover:bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded transition-colors">
+          Save
+        </button>
+        <button type="button"
+          hx-get="/projects/{{ .Project }}/secrets/{{ .Key }}/row"
+          hx-target="#secret-row-{{ .Key }}"
+          hx-swap="outerHTML"
+          class="text-xs text-gray-500 hover:text-gray-300 px-3 py-1.5 rounded border border-gray-700 hover:border-gray-600 transition-colors">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </td>
+</tr>
+{{ end }}
+
+
+{{ define "reveal-value" }}
+<pre id="val-{{ .Key }}" class="text-yellow-300 select-all whitespace-pre-wrap break-all font-mono text-xs inline">{{ .Value }}</pre>
+{{ end }}

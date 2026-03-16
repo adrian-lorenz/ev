@@ -1,0 +1,25 @@
+# Binary
+ev
+ev.exe
+
+# Build artifacts
+dist/
+*.tmp
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.cursor/
+.windsurf/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Go
+vendor/
+
+# Session token (never commit — contains access to your secrets)
+.envault.session
