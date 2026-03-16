@@ -85,7 +85,10 @@ heading "Verifying checksum…"
 
 cd "$TMP_DIR"
 
-if command -v sha256sum >/dev/null 2>&1; then
+if [ "$GOOS" = "darwin" ] && command -v shasum >/dev/null 2>&1; then
+  grep "$ARCHIVE" checksums.txt | shasum -a 256 --check --status \
+    || fatal "Checksum verification failed — the download may be corrupted or tampered with"
+elif command -v sha256sum >/dev/null 2>&1; then
   grep "$ARCHIVE" checksums.txt | sha256sum --check --status \
     || fatal "Checksum verification failed — the download may be corrupted or tampered with"
 elif command -v shasum >/dev/null 2>&1; then
