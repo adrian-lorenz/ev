@@ -30,7 +30,7 @@ func newManageCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate bind address
-			if bind != "127.0.0.1" && bind != "::1" && bind != "localhost" {
+			if bind != "127.0.0.1" && bind != "::1" {
 				return fmt.Errorf("bind address must be 127.0.0.1 or ::1 for security")
 			}
 

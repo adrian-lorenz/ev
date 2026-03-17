@@ -112,6 +112,7 @@ Sync is one-way: `ev -> 1Password`.
 - macOS Keychain support
 - Backup and restore built in
 - Single binary, no daemon, no cloud dependency
+- Secret and PII scanner with `ev scan`
 
 ## Installation
 
@@ -185,6 +186,8 @@ But for most dev workflows, `ev run` is the cleaner path.
 | `ev restore <file>` | Restore the vault from a backup |
 | `ev manage` | Start the local web UI |
 | `ev keychain save|check|delete` | macOS Keychain integration |
+| `ev scan [path...]` | Scan files for leaked secrets |
+| `ev scan --pii [path...]` | Scan files for secrets and PII |
 
 Global flags:
 
@@ -367,6 +370,52 @@ ev restore ~/.envault/backups/vault-2026-03-16T12-00-00.json
 `ev restore` creates a pre-restore backup before overwriting the active vault.
 
 `ev passwd` also creates a backup before changing the master password.
+
+## Scanning for leaked secrets
+
+`ev scan` walks your project files and flags anything that looks like a leaked credential or sensitive value — before it ends up in git or gets passed to an AI coding agent.
+
+```bash
+# scan current directory for secrets (API keys, tokens, credentials)
+ev scan
+
+# scan a specific path
+ev scan ./src
+
+# also detect PII (email, phone, IBAN, credit cards, …)
+ev scan --pii
+
+# save a plain-text report
+ev scan --report report.txt
+ev scan --pii --report report.txt ./src
+```
+
+Exit code is `1` when findings are present, so it works in CI:
+
+```yaml
+- run: ev scan
+```
+
+**What gets detected:**
+
+| Mode | Detectors |
+| --- | --- |
+| Default (`ev scan`) | 160+ secret patterns: API keys, tokens, passwords, database URLs, cloud credentials (AWS, GCP, Azure, OpenAI, GitHub, …) |
+| `--pii` | Everything above, plus: email, phone, IBAN, credit cards, German tax IDs, VAT IDs, health insurance numbers, license plates, addresses |
+
+Findings are shown with file, line, and confidence level. Matched values are redacted in the output. `.git/` directories, binary files, and files larger than 10 MB are skipped automatically.
+
+```
+ev scan  (secrets only)
+────────────────────────────────────────────────────────────
+
+config/settings.py
+  HIGH  config/settings.py:12:14  openai-api-key  sk-proj******…
+  HIGH  config/settings.py:18:9   aws-access-key  AKIAZ0******…
+
+────────────────────────────────────────────────────────────
+2 finding(s) across 1 file(s)  (38 files scanned)
+```
 
 ## Security
 

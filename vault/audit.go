@@ -1,11 +1,19 @@
 package vault
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 )
+
+// HashName returns a short, non-reversible identifier for a project or key name
+// so that audit log entries are useful for correlation without exposing plaintext names.
+func HashName(s string) string {
+	h := sha256.Sum256([]byte(s))
+	return fmt.Sprintf("%x", h[:6]) // 12 hex chars, 48-bit prefix
+}
 
 // Audit appends a structured entry to ~/.envault/audit.log.
 // Failures are silently ignored so that audit errors never break normal operations.

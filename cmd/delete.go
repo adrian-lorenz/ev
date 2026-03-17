@@ -50,7 +50,7 @@ func newDeleteCmd() *cobra.Command {
 			}
 
 			_ = vault.RefreshSession(project, v.GetAll(project))
-			vault.Audit("delete-secret", fmt.Sprintf("project=%s key=%s", project, key))
+			vault.Audit("delete-secret", fmt.Sprintf("project=%s key=%s", vault.HashName(project), vault.HashName(key)))
 			fmt.Fprintf(os.Stderr, "Deleted %s from project %q\n", key, project)
 			return nil
 		},

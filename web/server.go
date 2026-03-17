@@ -173,7 +173,7 @@ func (s *Server) handleSetSecret(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.refreshSession(project)
-	vault.Audit("set-secret", "project="+project+" key="+key)
+	vault.Audit("set-secret", "project="+vault.HashName(project)+" key="+vault.HashName(key))
 	s.render(w, "secret-rows", s.buildSecretArea(project))
 }
 
@@ -199,7 +199,7 @@ func (s *Server) handleDeleteSecret(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.refreshSession(project)
-	vault.Audit("delete-secret", "project="+project+" key="+key)
+	vault.Audit("delete-secret", "project="+vault.HashName(project)+" key="+vault.HashName(key))
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -258,7 +258,7 @@ func (s *Server) handleUpdateSecret(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.refreshSession(project)
-	vault.Audit("update-secret", "project="+project+" key="+key)
+	vault.Audit("update-secret", "project="+vault.HashName(project)+" key="+vault.HashName(key))
 	s.render(w, "secret-row", struct {
 		Project string
 		Key     string
@@ -281,7 +281,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vault.Audit("create-project", "project="+name)
+	vault.Audit("create-project", "project="+vault.HashName(name))
 	s.render(w, "project-list", s.Vault.ListProjects())
 }
 
@@ -302,7 +302,7 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vault.Audit("delete-project", "project="+project)
+	vault.Audit("delete-project", "project="+vault.HashName(project))
 	// Return updated project list; HTMX OOB clears the secret area
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	s.tmpl.ExecuteTemplate(w, "project-list", s.Vault.ListProjects())

@@ -29,8 +29,7 @@ func sessionKeyPath(project string) (string, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", err
 	}
-	safe := filepath.Base(project)
-	return filepath.Join(dir, safe+".key"), nil
+	return filepath.Join(dir, safeProjectID(project)+".key"), nil
 }
 
 // machineSecret derives a stable, machine-specific 32-byte key used to wrap

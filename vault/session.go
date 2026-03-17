@@ -4,6 +4,8 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,6 +30,14 @@ var (
 	deleteSessionSecret = removeSessionSecret
 )
 
+// safeProjectID returns a collision-resistant, filename-safe identifier for
+// the given project name. Using a SHA-256 hash prevents path traversal
+// collisions (e.g. "foo" and "../foo" must not share the same session file).
+func safeProjectID(project string) string {
+	h := sha256.Sum256([]byte(project))
+	return hex.EncodeToString(h[:])
+}
+
 func sessionPath(project string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -37,9 +47,7 @@ func sessionPath(project string) (string, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", err
 	}
-	// sanitize project name for use as filename
-	safe := filepath.Base(project)
-	return filepath.Join(dir, safe+".json"), nil
+	return filepath.Join(dir, safeProjectID(project)+".json"), nil
 }
 
 // CreateSession encrypts the project vars and stores them in ~/.envault/sessions/<project>.json.
