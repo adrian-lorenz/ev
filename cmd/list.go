@@ -6,6 +6,8 @@ import (
 	"os"
 	"sort"
 
+	"envault/vault"
+
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +19,7 @@ func init() {
 
 func newListCmd() *cobra.Command {
 	var asJSON bool
+	var useKeychain bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -33,8 +36,14 @@ func newListCmd() *cobra.Command {
 				}
 				sort.Strings(keys)
 			} else {
-				// Priority 2: full vault
-				v, _, _, err := openVault()
+				// Priority 2: Keychain or password prompt
+				var v *vault.Vault
+				var err error
+				if useKeychain {
+					v, _, _, err = openVaultKeychain()
+				} else {
+					v, _, _, err = openVault()
+				}
 				if err != nil {
 					return err
 				}
@@ -57,6 +66,7 @@ func newListCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output as JSON array")
+	cmd.Flags().BoolVarP(&useKeychain, "keychain", "k", false, "read master password from macOS Keychain (no prompt)")
 	return cmd
 }
 

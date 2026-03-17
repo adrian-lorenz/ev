@@ -102,7 +102,7 @@ PyCharm setup:
 		},
 	}
 
-	cmd.Flags().BoolVar(&useKeychain, "keychain", false, "read master password from macOS Keychain (no prompt)")
+	cmd.Flags().BoolVarP(&useKeychain, "keychain", "k", false, "read master password from macOS Keychain (no prompt)")
 	cmd.Flags().BoolVar(&saveKeychain, "save-keychain", false, "prompt once, save to macOS Keychain, then run")
 	// Stop flag parsing at the first non-flag argument so flags like --reload
 	// are passed through to the child command, not interpreted by ev.

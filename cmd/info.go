@@ -16,7 +16,9 @@ func init() {
 }
 
 func newInfoCmd() *cobra.Command {
-	return &cobra.Command{
+	var useKeychain bool
+
+	cmd := &cobra.Command{
 		Use:   "info",
 		Short: "Show current project, vault, and session status",
 		Args:  cobra.NoArgs,
@@ -54,11 +56,15 @@ func newInfoCmd() *cobra.Command {
 				fmt.Fprintf(os.Stderr, "  Keychain  : not set\n")
 			}
 
-			// --- Secrets count (session or vault) ---
+			// --- Secrets count (session, keychain, or hint) ---
 			if sv := trySession(); sv != nil {
 				fmt.Fprintf(os.Stderr, "  Secrets   : %d (from session)\n", len(sv))
+			} else if useKeychain && vault.Exists(vaultPath) {
+				v, _, _, err := openVaultKeychain()
+				if err == nil {
+					fmt.Fprintf(os.Stderr, "  Secrets   : %d (from keychain)\n", len(v.ListKeys(project)))
+				}
 			} else if vault.Exists(vaultPath) {
-				// Open vault silently only if we can — skip if no session to avoid password prompt
 				fmt.Fprintf(os.Stderr, "  Secrets   : run  ev list  to see keys\n")
 			}
 
@@ -79,6 +85,9 @@ func newInfoCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVarP(&useKeychain, "keychain", "k", false, "read master password from macOS Keychain (no prompt)")
+	return cmd
 }
 
 // resolveProjectSource returns a human-readable description of where the project name came from.

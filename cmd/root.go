@@ -124,6 +124,25 @@ func trySession() map[string]string {
 	return vars
 }
 
+// openVaultKeychain opens the vault using the password stored in macOS Keychain.
+// Falls back to a password prompt if no Keychain entry exists.
+func openVaultKeychain() (*vault.Vault, string, string, error) {
+	path, err := resolveVaultPath()
+	if err != nil {
+		return nil, "", "", err
+	}
+	password, err := vault.KeychainGet()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "No password in Keychain — prompting.")
+		return openVault()
+	}
+	v, err := vault.Open(path, password)
+	if err != nil {
+		return nil, "", "", err
+	}
+	return v, path, password, nil
+}
+
 // openVault prompts for the master password and opens (or creates) the vault.
 // If the vault is new, it asks to set a password with confirmation.
 func openVault() (*vault.Vault, string, string, error) {
