@@ -67,7 +67,7 @@ Exit code 1 when findings are present.`,
 						return nil
 					}
 					if d.IsDir() {
-						if strings.HasPrefix(d.Name(), ".") {
+						if d.Name() != "." && strings.HasPrefix(d.Name(), ".") {
 							return filepath.SkipDir
 						}
 						return nil
