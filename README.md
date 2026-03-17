@@ -2,12 +2,25 @@
 
 **Local encrypted secret manager — built for the age of AI coding agents.**
 
-```
-$ cd my-project
-$ ev set DATABASE_URL
-Value for DATABASE_URL: ••••••••••••
+## Quick Start
 
-$ ev run uvicorn main:app --reload   # no eval, no --, just works
+
+
+```bash
+# see installation instructions below or download release binaries
+ev init my-project
+cd my-project
+ev import .env
+# rm .env
+ev open
+
+# load secrets into your shell session
+# eval "$(ev load)" 
+# or
+ev run uvicorn main:app --reload   # no eval, no --, just works
+
+# manage your secrets
+ev manage
 ```
 
 ---
