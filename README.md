@@ -55,6 +55,7 @@ my-project/                     my-project/
 - **Shell integration** — works with bash, zsh, fish
 - **Terraform ready** — `ev run terraform plan` injects `TF_VAR_*` automatically
 - **Import** from `.env`, `secrets.tfvars`, and Terraform map blocks
+- **1Password sync** — `ev sync 1password` pushes all projects to a 1Password vault as Secure Notes (`.env` format)
 - **Backup / restore** — `ev backup` and `ev restore`
 - **Change master password** — `ev passwd` (auto-creates a backup first)
 - **Single binary, ~9 MB**, no daemon, no cloud
@@ -114,11 +115,13 @@ python app.py
 | `ev info` | Show project, vault, session status and usage hints |
 | `ev set KEY [VALUE]` | Add or update a secret |
 | `ev get KEY` | Print a secret value |
-| `ev list` | List all secret keys |
+| `ev list` | List all secret keys for the current project |
+| `ev list projects` | List all projects in the vault |
 | `ev load` | Output `export` statements for `eval` |
 | `ev run <cmd> [args...]` | Run a command with secrets injected |
 | `ev delete KEY` | Remove a secret |
 | `ev import <file>` | Import from `.env` or `.tfvars` |
+| `ev sync 1password` | Push all projects to 1Password as Secure Notes |
 | `ev open [--ttl 8h]` | Unlock vault for a timed session |
 | `ev close` | Revoke the current session |
 | `ev session` | Show session status |
@@ -355,6 +358,36 @@ ev restore ~/.envault/backups/vault-2026-03-16T12-00-00.json
 `ev restore` automatically saves a pre-restore backup before overwriting.
 
 `ev passwd` also creates a timestamped backup before changing the password.
+
+---
+
+## 1Password Sync
+
+Push all your projects to 1Password as Secure Notes — useful as an encrypted off-site backup or for sharing secrets with teammates.
+
+**Requirements:** [1Password CLI](https://developer.1password.com/docs/cli) (`op`) installed and signed in.
+
+```bash
+# Sync all projects to a specific 1Password vault
+ev sync 1password --op-vault envvault
+
+# Sync a single project
+ev sync 1password --op-vault envvault --project my-api
+
+# Interactive vault selection (if --op-vault is omitted)
+ev sync 1password
+```
+
+Each project is stored as a Secure Note titled `ev: <project-name>` in the target vault. The note contains all secrets in `.env` format. Re-running the command updates the note in place.
+
+```
+1Password vault "envvault"
+  ev: my-api        ← Secure Note: API_KEY=...\nDB_URL=...\n...
+  ev: payment-svc   ← Secure Note: STRIPE_KEY=...\n...
+  ev: infra         ← Secure Note: AWS_ACCESS_KEY_ID=...\n...
+```
+
+> Only one direction: ev → 1Password. The master password is never sent to 1Password — only the decrypted secret values are pushed.
 
 ---
 

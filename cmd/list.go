@@ -10,7 +10,9 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(newListCmd())
+	cmd := newListCmd()
+	cmd.AddCommand(newListProjectsCmd())
+	rootCmd.AddCommand(cmd)
 }
 
 func newListCmd() *cobra.Command {
@@ -49,6 +51,37 @@ func newListCmd() *cobra.Command {
 			}
 			for _, k := range keys {
 				fmt.Println(k)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output as JSON array")
+	return cmd
+}
+
+func newListProjectsCmd() *cobra.Command {
+	var asJSON bool
+
+	cmd := &cobra.Command{
+		Use:   "projects",
+		Short: "List all projects in the vault",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			v, _, _, err := openVault()
+			if err != nil {
+				return err
+			}
+			projects := v.ListProjects()
+			if len(projects) == 0 {
+				fmt.Fprintln(os.Stderr, "No projects found in vault")
+				return nil
+			}
+			if asJSON {
+				return json.NewEncoder(os.Stdout).Encode(projects)
+			}
+			for _, p := range projects {
+				fmt.Println(p)
 			}
 			return nil
 		},
