@@ -1,6 +1,11 @@
 package detector
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func repeatStr(s string, n int) string { return strings.Repeat(s, n) }
 
 // Secrets are split across string literals so GitHub secret scanning
 // does not flag this test file as containing live credentials.

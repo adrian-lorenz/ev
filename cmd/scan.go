@@ -39,27 +39,19 @@ type fileFinding struct {
 }
 
 func newScanCmd() *cobra.Command {
-	var allPII bool
 	var reportPath string
 
 	cmd := &cobra.Command{
 		Use:   "scan [path...]",
-		Short: "Scan files for leaked secrets and PII",
-		Long: `Scans files for leaked secrets and credentials.
+		Short: "Scan files for leaked secrets and credentials",
+		Long: `Scans files for leaked secrets and credentials (API keys, tokens, passwords, …).
 
-By default only secret and API-key patterns are detected (SECRET, URL_SECRET).
-Use --pii to also detect personal data: email, phone, IBAN, credit cards, etc.
-
-Paths default to the current directory. .git/ directories are always skipped.
-Files larger than 10 MB or binary files are skipped.
+Paths default to the current directory. Dot-directories (.git, .idea, …),
+binary files, and files larger than 10 MB are skipped automatically.
 
 Exit code 1 when findings are present.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var detectorList []string
-			if !allPII {
-				detectorList = []string{"SECRET", "URL_SECRET"}
-			}
-			sc := detector.NewScanner(detectorList)
+			sc := detector.NewScanner(nil)
 
 			roots := args
 			if len(roots) == 0 {
@@ -75,7 +67,7 @@ Exit code 1 when findings are present.`,
 						return nil
 					}
 					if d.IsDir() {
-						if d.Name() == ".git" {
+						if strings.HasPrefix(d.Name(), ".") {
 							return filepath.SkipDir
 						}
 						return nil
@@ -92,7 +84,7 @@ Exit code 1 when findings are present.`,
 						return nil
 					}
 
-					text := string(content)
+					text := blankNoscanLines(string(content))
 					_, hits := sc.Scan(text)
 					filesScanned++
 
@@ -113,7 +105,7 @@ Exit code 1 when findings are present.`,
 			}
 
 			useColor := stdoutIsTerminal()
-			output := renderOutput(findings, filesScanned, useColor, allPII)
+			output := renderOutput(findings, filesScanned, useColor)
 
 			if reportPath != "" {
 				if err := os.WriteFile(reportPath, []byte(stripANSI(output)), 0600); err != nil {
@@ -131,12 +123,11 @@ Exit code 1 when findings are present.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&allPII, "pii", false, "also detect PII (email, phone, IBAN, credit cards, …)")
 	cmd.Flags().StringVar(&reportPath, "report", "", "save plain-text report to file")
 	return cmd
 }
 
-func renderOutput(findings []fileFinding, filesScanned int, color bool, pii bool) string {
+func renderOutput(findings []fileFinding, filesScanned int, color bool) string {
 	col := func(code, s string) string {
 		if color {
 			return code + s + ansiReset
@@ -150,13 +141,8 @@ func renderOutput(findings []fileFinding, filesScanned int, color bool, pii bool
 	cyan := func(s string) string { return col(ansiCyan, s) }
 	gray := func(s string) string { return col(ansiGray, s) }
 
-	mode := "secrets only"
-	if pii {
-		mode = "secrets + PII"
-	}
-
 	var sb strings.Builder
-	sb.WriteString(bold("ev scan") + "  " + gray("("+mode+")") + "\n")
+	sb.WriteString(bold("ev scan") + "\n")
 	sb.WriteString(strings.Repeat("─", 60) + "\n\n")
 
 	if len(findings) == 0 {
@@ -263,6 +249,25 @@ func looksLikeText(b []byte) bool {
 func stdoutIsTerminal() bool {
 	fi, err := os.Stdout.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
+// blankNoscanLines replaces lines containing "# noscan" or "// noscan" with
+// spaces of equal byte length, preserving byte offsets so findings on other
+// lines are unaffected. The marker is case-insensitive.
+func blankNoscanLines(text string) string {
+	lines := strings.Split(text, "\n")
+	changed := false
+	for i, line := range lines {
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "# noscan") || strings.Contains(lower, "// noscan") {
+			lines[i] = strings.Repeat(" ", len(line))
+			changed = true
+		}
+	}
+	if !changed {
+		return text
+	}
+	return strings.Join(lines, "\n")
 }
 
 // stripANSI removes ANSI escape sequences for plain-text output.

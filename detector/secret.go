@@ -39,7 +39,6 @@ func init() {
 		{"jwt-token", `eyJ[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.?[A-Za-z0-9\-_.+/=]*`, 0, "MEDIUM"},
 		{"private-key-header", `-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY( BLOCK)?-----`, 0, "CRITICAL"},
 		{"generic-secret", `(?i)(secret|password|passwd|pwd|api[_-]?key|auth[_-]?token|access[_-]?token)["'\s]*[:=]["'\s]+([A-Za-z0-9!@#$%^&*()\-_+=]{16,})`, 2, "MEDIUM"},
-		{"basic-auth-url", `[a-zA-Z][a-zA-Z0-9+\-.]*://[^:@\s]+:[^:@\s]+@[^@\s]+`, 0, "HIGH"},
 		{"npm-token", `npm_[A-Za-z0-9]{36}`, 0, "HIGH"},
 		{"docker-hub-pat", `dckr_pat_[A-Za-z0-9\-_]{27}`, 0, "HIGH"},
 		// LLM / AI
@@ -111,14 +110,9 @@ func init() {
 		{"grafana-service-account", `glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}`, 0, "HIGH"},
 		{"lightstep-token", `(?i)(?:x-lightstep-access-token|lightstep[._-]?token)\s*[=:]\s*([A-Za-z0-9\-_]{20,})`, 1, "HIGH"},
 		// HTTP Auth
-		{"http-basic-auth-header", `(?i)(?:Authorization|auth)\s*[:=]\s*Basic\s+([A-Za-z0-9+/]{8,}={0,2})`, 1, "HIGH"},
-		{"http-basic-auth-curl", `curl\s+[^\n]*(?:-u|--user)\s+([^:'\s"]+:[^@'\s"]+)`, 1, "HIGH"},
-		{"http-basic-auth-env", `(?i)BASIC[_-]?AUTH\s*[=:]\s*([A-Za-z0-9+/]{8,}={0,2})`, 1, "HIGH"},
 		{"http-bearer-header", `(?i)(?:Authorization|auth)\s*[:=]\s*Bearer\s+([A-Za-z0-9\-_=+/.]{16,})`, 1, "HIGH"},
 		{"http-bearer-env", `(?i)BEARER[_-]?TOKEN\s*[=:]\s*([A-Za-z0-9\-_=+/.]{16,})`, 1, "HIGH"},
 		{"http-bearer-curl", `(?i)curl\s+[^\n]*-H\s+"Authorization:\s*Bearer\s+([A-Za-z0-9\-_=+/.]{16,})"`, 1, "HIGH"},
-		{"http-insecure-url", `http://[a-zA-Z0-9\-._~:/?#@!$&()*+,;=%]{4,}`, 0, "WARNING"},
-		{"http-auth-over-http", `(?i)http://[^:@\s]+:[^:@\s]+@[^\s]+`, 0, "CRITICAL"},
 		// Infrastructure / CI
 		{"vault-service-token", `hvs\.[A-Za-z0-9_-]{24,}`, 0, "CRITICAL"},
 		{"vault-batch-token", `hvb\.[A-Za-z0-9_-]{24,}`, 0, "CRITICAL"},
@@ -126,7 +120,6 @@ func init() {
 		{"digitalocean-pat", `dop_v1_[a-f0-9]{64}`, 0, "CRITICAL"},
 		{"circleci-token", `ccipat_[A-Za-z0-9]{40,}`, 0, "HIGH"},
 		// Email providers
-		{"resend-api-key", `re_[A-Za-z0-9_-]{24,}`, 0, "HIGH"},
 		{"mailgun-api-key", `\bkey-[a-f0-9]{32}\b`, 0, "HIGH"},
 		{"postmark-server-token", `(?i)(?:POSTMARK[._-]?(?:SERVER[._-]?)?(?:API[._-]?)?TOKEN|X-Postmark-Server-Token)\s*[=:]\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})`, 1, "HIGH"},
 		// Database / BaaS

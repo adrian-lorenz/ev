@@ -1,6 +1,4 @@
-// Package detector provides regex-based PII detection for DACH (DE/AT/CH) text.
-// Supported types: EMAIL, PHONE, CREDIT_CARD, IBAN, PERSONAL_ID, SOCIAL_SECURITY,
-// TAX_ID, VAT_ID, KVNR, LICENSE_PLATE, DRIVER_LICENSE, URL_SECRET, SECRET, ADDRESS.
+// Package detector scans text for leaked secrets and credentials.
 package detector
 
 import (
@@ -9,45 +7,19 @@ import (
 	"strings"
 )
 
-// PiiType identifies the kind of PII.
+// PiiType identifies the kind of finding.
 type PiiType string
 
 const (
-	PiiEmail         PiiType = "EMAIL"
-	PiiPhone         PiiType = "PHONE"
-	PiiCreditCard    PiiType = "CREDIT_CARD"
-	PiiIBAN          PiiType = "IBAN"
-	PiiPersonalID    PiiType = "PERSONAL_ID"
-	PiiSocialSec     PiiType = "SOCIAL_SECURITY"
-	PiiTaxID         PiiType = "TAX_ID"
-	PiiAddress       PiiType = "ADDRESS"
-	PiiSecret        PiiType = "SECRET"
-	PiiURLSecret     PiiType = "URL_SECRET"
-	PiiKVNR          PiiType = "KVNR"
-	PiiLicensePlate  PiiType = "LICENSE_PLATE"
-	PiiVATID         PiiType = "VAT_ID"
-	PiiDriverLicense PiiType = "DRIVER_LICENSE"
+	PiiSecret PiiType = "SECRET"
 )
 
 // piiPriority controls overlap resolution: higher value wins.
 var piiPriority = map[PiiType]int{
-	PiiSecret:        6,
-	PiiURLSecret:     6,
-	PiiIBAN:          5,
-	PiiCreditCard:    5,
-	PiiSocialSec:     5,
-	PiiKVNR:          5,
-	PiiPersonalID:    4,
-	PiiTaxID:         4,
-	PiiEmail:         4,
-	PiiVATID:         4,
-	PiiDriverLicense: 4,
-	PiiPhone:         3,
-	PiiLicensePlate:  3,
-	PiiAddress:       2,
+	PiiSecret: 6,
 }
 
-// Finding is a single PII detection result.
+// Finding is a single detection result.
 type Finding struct {
 	Type        PiiType
 	Start       int
@@ -58,7 +30,7 @@ type Finding struct {
 	RuleID      string // only set for SECRET findings
 }
 
-// Scanner runs all enabled detectors and produces anonymised text.
+// Scanner runs enabled detectors over text.
 type Scanner struct {
 	enabledTypes map[PiiType]bool
 	allTypes     bool
@@ -98,19 +70,6 @@ func (s *Scanner) ScanWithWhitelist(text string, whitelist []string) (string, []
 	}
 	detectors := []entry{
 		{PiiSecret, detectSecrets},
-		{PiiURLSecret, detectURLSecret},
-		{PiiEmail, detectEmail},
-		{PiiPhone, detectPhone},
-		{PiiCreditCard, detectCreditCard},
-		{PiiIBAN, detectIBAN},
-		{PiiPersonalID, detectPersonalID},
-		{PiiSocialSec, detectSocialSecurity},
-		{PiiTaxID, detectTaxID},
-		{PiiVATID, detectVATID},
-		{PiiKVNR, detectKVNR},
-		{PiiLicensePlate, detectLicensePlate},
-		{PiiDriverLicense, detectDriverLicense},
-		{PiiAddress, detectAddress},
 	}
 
 	var all []Finding
@@ -207,7 +166,6 @@ func resolveOverlaps(findings []Finding) []Finding {
 			result = append(result, f)
 			lastEnd = f.End
 		} else if len(result) > 0 {
-			// Overlap: replace previous finding if current has higher priority or is longer at same priority.
 			prev := result[len(result)-1]
 			pi, pj := piiPriority[prev.Type], piiPriority[f.Type]
 			if pj > pi || (pj == pi && (f.End-f.Start) > (prev.End-prev.Start)) {
