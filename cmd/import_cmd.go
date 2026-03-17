@@ -190,11 +190,23 @@ func stripInlineComment(s string) string {
 		return s
 	}
 	// Unquoted: strip #, //, /* ... */ comments
-	// Find earliest comment marker
+	// Find earliest comment marker (// must be preceded by whitespace or be at start
+	// to avoid treating URLs like https:// or postgres:// as comments)
 	earliest := len(s)
-	for _, marker := range []string{"#", "//", "/*"} {
+	for _, marker := range []string{"#", "/*"} {
 		if idx := strings.Index(s, marker); idx >= 0 && idx < earliest {
 			earliest = idx
+		}
+	}
+	// // is a comment only when at position 0 or preceded by whitespace
+	for i := 0; i <= len(s)-2; i++ {
+		if s[i] == '/' && s[i+1] == '/' {
+			if i == 0 || s[i-1] == ' ' || s[i-1] == '\t' {
+				if i < earliest {
+					earliest = i
+				}
+				break
+			}
 		}
 	}
 	return strings.TrimSpace(s[:earliest])
