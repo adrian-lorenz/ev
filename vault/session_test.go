@@ -43,7 +43,7 @@ func TestCreateSessionStoresSecretOutsideSessionFile(t *testing.T) {
 		t.Fatal("expected non-zero expiry")
 	}
 
-	path := filepath.Join(os.Getenv("HOME"), ".envault", "sessions", "demo.json")
+	path := filepath.Join(os.Getenv("HOME"), ".envault", "sessions", safeProjectID("demo")+".json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("ReadFile failed: %v", err)
