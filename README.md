@@ -1,80 +1,133 @@
 # ev
 
-**Local encrypted secret manager — built for the age of AI coding agents.**
+[![Test](https://github.com/adrian-lorenz/ev/actions/workflows/test.yml/badge.svg)](https://github.com/adrian-lorenz/ev/actions/workflows/test.yml)
+[![Release](https://github.com/adrian-lorenz/ev/actions/workflows/release.yml/badge.svg)](https://github.com/adrian-lorenz/ev/actions/workflows/release.yml)
+[![Go Version](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](#license)
+
+**Local encrypted secret manager for modern AI-native development.**
+
+`ev` moves secrets out of your repo, encrypts them locally, and gives them back only when your app actually runs.
+
+- No `.env` files sitting next to code
+- No daemon, no cloud, no background service
+- Great DX for `uv`, `go`, `npm`, `terraform`, IDE run configs, and AI coding agents
+- Optional `1Password` sync for encrypted off-site backup
+
+## Why ev exists
+
+AI coding agents can read your whole working tree. If secrets live in `.env`, `secrets.tfvars`, or `config.local.json`, they are part of that surface area.
+
+`ev` keeps secrets outside the project and stores only a small `.envault` marker file in the repo.
+
+```text
+before                          after
+----------------------------    --------------------------------
+my-project/                     my-project/
+  .env          <- visible        .envault      <- project name only
+  app.py                         app.py
+  ...                            ...
+
+                                 ~/.envault/
+                                   vault.json  <- encrypted vault
+```
 
 ## Quick Start
 
-
-
 ```bash
-# see installation instructions below or download release binaries
-ev init my-project
+# install
+curl -fsSL https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.sh | bash
+
+# inside your project
 cd my-project
+ev init
 ev import .env
-# rm .env
+
+# recommended workflow
 ev open
+ev run uv run python main.py
 
-# load secrets into your shell session
-# eval "$(ev load)" 
-# or
-ev run uvicorn main:app --reload   # no eval, no --, just works
-
-# manage your secrets
+# or manage visually
 ev manage
 ```
 
----
+## Why it feels good to use
 
-## The Problem
+### `ev run` is the star
 
-Modern AI coding agents (Claude Code, Cursor, Copilot, Codex) have read access to your entire project directory. That means any `.env` file, `secrets.tfvars`, or `config.local.json` sitting in your repo is potentially visible to the agent — and could end up in logs, prompts, or completions.
+Instead of exporting secrets into your shell and hoping every subprocess inherits the right state, `ev run` injects them directly into the child process.
 
-ev moves secrets **out of your project** entirely.
-
-```
-before                          after
-──────────────────────          ──────────────────────────────
-my-project/                     my-project/
-  .env          ← AI sees this    .envault      ← just the project name
-  app.py                          app.py
-  ...                             ...
-                                ~/.envault/
-                                  vault.json  ← AES-256 encrypted
+```bash
+ev run uv run python main.py
+ev run uvicorn main:app --reload
+ev run go run .
+ev run npm run dev
+ev run terraform plan
 ```
 
----
+That means:
+
+- less shell pollution
+- no copy-pasting secrets around
+- great fit for IDE run configs
+- especially nice with `uv`, where you often want one clean command that just works
+
+When a session is open, `ev run` becomes the "set it and forget it" path for local development.
+
+### `1Password Sync` is a strong companion
+
+`ev` is intentionally local-first. But sometimes you still want an encrypted copy outside your machine, or a simple way to hand project secrets to teammates.
+
+```bash
+ev sync 1password --op-vault engineering
+ev sync 1password --op-vault engineering --project my-api
+```
+
+`ev` pushes each project as a Secure Note in `.env` format:
+
+```text
+engineering
+  ev: my-api
+  ev: payment-service
+  ev: infra
+```
+
+This is especially useful for:
+
+- off-site backup
+- team handoff
+- keeping "what this project needs" in one shareable place
+
+Sync is one-way: `ev -> 1Password`.
 
 ## Features
 
-- **AES-256-GCM encryption** with Argon2id key derivation
-- **Zero secrets in your project** — only a `.envault` file with the project name
-- **Auto-detects project** from directory name — searches up the tree like git, stops at `.git`
-- **HTMX web UI** (`ev manage`) for visual secret management
-- **Session support** — `ev open` unlocks once, no prompts for 8 hours
-- **Session auto-refresh** — `set`, `delete`, `import`, and web UI keep the session in sync
-- **Shell integration** — works with bash, zsh, fish
-- **Terraform ready** — `ev run terraform plan` injects `TF_VAR_*` automatically
-- **Import** from `.env`, `secrets.tfvars`, and Terraform map blocks
-- **1Password sync** — `ev sync 1password` pushes all projects to a 1Password vault as Secure Notes (`.env` format)
-- **Backup / restore** — `ev backup` and `ev restore`
-- **Change master password** — `ev passwd` (auto-creates a backup first)
-- **Single binary, ~9 MB**, no daemon, no cloud
-
----
+- AES-256-GCM encryption with Argon2id key derivation
+- Secrets live outside the repo in `~/.envault/vault.json`
+- `.envault` file contains only the project name and is safe to commit
+- Session-based unlock flow with `ev open`
+- HTMX management UI with `ev manage`
+- Import from `.env`, `.tfvars`, and Terraform map blocks
+- Automatic `TF_VAR_*` injection for Terraform
+- macOS Keychain support
+- Backup and restore built in
+- Single binary, no daemon, no cloud dependency
 
 ## Installation
+
+### Install script
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.sh | bash
 ```
 
-Or with Go:
+### Go install
 
 ```bash
 go install github.com/adrian-lorenz/ev@latest
 ```
 
-Or build from source:
+### Build from source
 
 ```bash
 git clone https://github.com/adrian-lorenz/ev
@@ -82,130 +135,195 @@ cd ev
 make build
 ```
 
----
-
-## Quick Start
+## Typical workflow
 
 ```bash
-# 1. Go to your project
-cd my-project
-
-# 2. (Optional) name the project — otherwise the directory name is used
+# 1. initialize once per project
 ev init
 
-# 3. Store secrets
+# 2. add secrets
 ev set DATABASE_URL
 ev set OPENAI_API_KEY
 
-# 4a. Run directly (recommended)
-ev run uvicorn main:app --reload
+# 3. unlock once
+ev open
 
-# 4b. Or load into your shell session
-eval "$(ev load)"
-python app.py
+# 4. run tools with injected secrets
+ev run uv run python main.py
+ev run npm run dev
+ev run terraform plan
 ```
 
----
+`ev load` still exists when you want shell exports:
+
+```bash
+eval "$(ev load)"
+```
+
+But for most dev workflows, `ev run` is the cleaner path.
 
 ## Commands
 
 | Command | Description |
-|---|---|
+| --- | --- |
 | `ev init [name]` | Create `.envault` in the current directory |
-| `ev info` | Show project, vault, session status and usage hints |
+| `ev info` | Show project, vault, session status, and usage hints |
 | `ev set KEY [VALUE]` | Add or update a secret |
 | `ev get KEY` | Print a secret value |
-| `ev list` | List all secret keys for the current project |
+| `ev list` | List secret keys for the current project |
 | `ev list projects` | List all projects in the vault |
-| `ev load` | Output `export` statements for `eval` |
+| `ev load` | Output shell exports for `eval` or `source` |
 | `ev run <cmd> [args...]` | Run a command with secrets injected |
 | `ev delete KEY` | Remove a secret |
 | `ev import <file>` | Import from `.env` or `.tfvars` |
-| `ev sync 1password` | Push all projects to 1Password as Secure Notes |
-| `ev open [--ttl 8h]` | Unlock vault for a timed session |
+| `ev sync 1password` | Push one or all projects to 1Password |
+| `ev open [--ttl 8h]` | Unlock the vault for a timed session |
 | `ev close` | Revoke the current session |
-| `ev session` | Show session status |
+| `ev session` | Show current session status |
 | `ev passwd` | Change the master password |
 | `ev backup [file]` | Back up the vault |
-| `ev restore <file>` | Restore vault from a backup |
-| `ev manage` | Open the web UI |
-| `ev keychain save\|check\|delete` | macOS Keychain integration |
+| `ev restore <file>` | Restore the vault from a backup |
+| `ev manage` | Start the local web UI |
+| `ev keychain save|check|delete` | macOS Keychain integration |
 
-All commands accept:
-- `-p, --project <name>` — override project (default: `.envault` file or directory name)
-- `--vault <path>` — override vault location (default: `~/.envault/vault.json`)
+Global flags:
 
----
+- `-p, --project <name>` to override the detected project
+- `--vault <path>` to override the default vault path
 
-## `ev run` — the right way to inject secrets
+## `ev run` vs `ev load`
 
-Unlike `eval "$(ev load)"`, `ev run` injects secrets directly into the child process without exposing them in the shell. No `--` needed.
+### `ev run`
+
+Best for day-to-day development:
 
 ```bash
-ev run uvicorn main:app --reload
-ev run python main.py
-ev run go run ./...
-ev run npm start
+ev open
+ev run uv run python main.py
+ev run pytest
+ev run terraform apply
+```
+
+- injects secrets only for the command you launch
+- keeps your shell environment cleaner
+- works well in IDEs and scripts
+
+### `ev load`
+
+Still useful when you want an interactive shell with secrets already exported:
+
+```bash
+eval "$(ev load)"
+python main.py
+```
+
+## Sessions
+
+Unlock once and keep moving:
+
+```bash
+ev open
+ev open --ttl 4h
+
+ev session
+ev close
+```
+
+Once a session is active, commands like `ev run`, `ev get`, and `ev load` stop prompting for your password.
+
+Changes from `set`, `delete`, `import`, and the web UI automatically refresh the session data.
+
+## Import existing secrets
+
+### From `.env`
+
+```bash
+ev import .env --dry-run
+ev import .env
+rm .env
+```
+
+Supported:
+
+```bash
+DB_HOST=localhost
+DB_PASSWORD="my secret"
+export API_KEY=sk-abc123
+```
+
+### From `secrets.tfvars`
+
+```bash
+ev import secrets.tfvars --dry-run
+ev import secrets.tfvars
+rm secrets.tfvars
+```
+
+Terraform gets special treatment:
+
+```bash
 ev run terraform plan
 ```
 
-With an active session (`ev open`), no password prompt appears.
+For every secret, `ev` also sets a matching `TF_VAR_<key>` environment variable when the target command is Terraform.
 
-**Terraform**: `ev run terraform plan` automatically adds `TF_VAR_<key>` for every secret, so Terraform picks them up without a prompt.
-
----
-
-## Sessions — unlock once, work for hours
+## Web UI
 
 ```bash
-ev open           # prompt password once → valid for 8h
-ev open --ttl 4h  # custom duration
-
-ev run uvicorn main:app --reload   # no password prompt
-eval "$(ev load)"                  # no password prompt
-ev get DB_PASSWORD                 # no password prompt
-
-ev session        # check remaining time
-ev close          # revoke early
+ev manage
 ```
 
-Sessions are automatically refreshed when you `set`, `delete`, or `import` secrets — no need to `ev close` and `ev open` again.
+Starts the local UI on [http://localhost:7777](http://localhost:7777).
 
----
+You can:
 
-## `ev info` — see everything at a glance
+- browse projects
+- add, reveal, edit, and delete secrets
+- make changes offline on `127.0.0.1` only
+
+## 1Password sync
+
+Requirements:
+
+- [1Password CLI](https://developer.1password.com/docs/cli/) installed
+- signed in via `op signin`
+
+Examples:
 
 ```bash
-$ ev info
+# choose a vault interactively
+ev sync 1password
 
-  ev · local secret manager
-  ─────────────────────────────────────────
-  Project   : payment-service  (.envault file)
-  Vault     : /Users/you/.envault/vault.json  (4.2 KB)
-  Session   : open · expires 22:15:00  (7h 43m remaining)
-  Keychain  : not set
-  Secrets   : 8 (from session)
-  .envault  : /Users/you/projects/payment-service/.envault
+# sync everything to a specific vault
+ev sync 1password --op-vault engineering
 
-Detected project type: Python
-
-── How to use your secrets ───────────────────────────────────
-  ...
-──────────────────────────────────────────────────────────────
+# sync one project only
+ev sync 1password --op-vault engineering --project my-api
 ```
 
-Also shown automatically after `ev import`.
+Each note is named `ev: <project-name>` and contains the secrets in `.env` format.
 
----
+## Project detection
 
-## Shell Integration
+`ev` resolves the active project in this order:
+
+1. `--project`
+2. nearest `.envault` found by walking upward
+3. current directory name
+
+The upward search stops at a `.git` boundary, so it behaves a bit like Git and avoids leaking into unrelated parent repos.
+
+## Shell and IDE integration
 
 ### bash / zsh
 
 ```bash
 eval "$(ev load)"
+```
 
-# Shortcut for ~/.zshrc
+Optional helper:
+
+```bash
 evload() { eval "$(ev load "$@")"; }
 ```
 
@@ -215,225 +333,55 @@ evload() { eval "$(ev load "$@")"; }
 ev load --shell fish | source
 ```
 
-### direnv (auto-load on cd)
+### direnv
 
-Add to your project's `.envrc`:
+Put this in `.envrc`:
 
 ```bash
 eval "$(ev load)"
 ```
 
-Then run `direnv allow`.
+### IDEs
 
----
-
-## IDE Integration (PyCharm, VS Code, …)
-
-IDE run configurations start their own processes — `eval "$(ev load)"` in a terminal doesn't help them.
-
-**Recommended workflow:**
+A very comfortable setup is:
 
 ```bash
-ev open    # once in terminal, valid 8h
+ev open
 ```
 
-Then in the PyCharm Run Configuration:
-
-```
-ev run uv run .venv/bin/python -m uvicorn main:app --reload
-```
-
-No password prompt, no `--`, PyCharm manages the process normally (debugger, hot reload all work).
-
-### macOS Keychain (alternative to sessions)
+Then use commands like this in your run configuration:
 
 ```bash
-ev keychain save    # store master password in Keychain
-ev keychain check   # verify
-ev keychain delete  # remove
-
-ev run --keychain uvicorn main:app --reload   # silent, reads from Keychain
+ev run uv run python -m uvicorn main:app --reload
 ```
 
----
-
-## Web UI
+## Backup and restore
 
 ```bash
-ev manage
-```
-
-Opens `http://localhost:7777` — browse projects, add / reveal / edit / delete secrets. Fully offline, bound to `127.0.0.1` only. Changes made in the UI automatically refresh any active session.
-
----
-
-## Project Detection
-
-ev finds the project name by searching **up the directory tree** for `.envault` — works from any subdirectory, just like git. The search stops at a `.git` boundary so it never leaks into unrelated parent repositories.
-
-```bash
-# project root has .envault with "project=payment-service"
-cd ~/projects/payment-service/src/api
-ev load    # correctly finds "payment-service"
-```
-
-Priority:
-1. `--project` flag
-2. `.envault` file (searched upward, stops at `.git`)
-3. Current directory name
-
-The `.envault` file contains no secrets — safe to commit.
-
----
-
-## Import from `.env` or `.tfvars`
-
-Already have secrets in a file? Import them in one step and remove the file for good. After import, ev prints a usage guide based on the detected project type.
-
-### From .env
-
-```bash
-ev import .env --dry-run   # preview
-ev import .env             # import
-rm .env
-echo ".env" >> .gitignore
-
-ev run uvicorn main:app --reload
-```
-
-Supported formats:
-
-```bash
-DB_HOST=localhost
-DB_PASSWORD="my secret"
-export API_KEY=sk-abc123   # export prefix stripped
-# comments and // and /* */ are stripped from values
-```
-
-### From secrets.tfvars
-
-```bash
-ev import secrets.tfvars --dry-run
-ev import secrets.tfvars
-rm secrets.tfvars
-echo "*.tfvars" >> .gitignore
-
-ev run terraform plan   # TF_VAR_* injected automatically
-```
-
-Supported tfvars formats:
-
-```hcl
-db_password = "secret"                  # simple string
-db_password = "secret"  # comment       # inline comments stripped
-
-global_secrets = {                      # flat map → imported as individual secrets
-  "api-key"  = "sk-abc"                 #   keys: hyphens → underscores
-  "db-pass"  = "hunter2"
-}
-
-github_repos = {                        # map with complex keys → stored as single value
-  "org/repo" = "ref:refs/heads/main"
-}
-```
-
-### Flags
-
-```bash
-ev import .env --dry-run        # preview without saving
-ev import .env --no-overwrite   # skip keys that already exist
-```
-
----
-
-## Backup & Restore
-
-```bash
-ev backup                    # → ~/.envault/backups/vault-<timestamp>.json
-ev backup ~/Desktop/ev.bak   # custom path
+ev backup
+ev backup ~/Desktop/ev.bak
 
 ev restore ~/.envault/backups/vault-2026-03-16T12-00-00.json
 ```
 
-`ev restore` automatically saves a pre-restore backup before overwriting.
+`ev restore` creates a pre-restore backup before overwriting the active vault.
 
-`ev passwd` also creates a timestamped backup before changing the password.
-
----
-
-## 1Password Sync
-
-Push all your projects to 1Password as Secure Notes — useful as an encrypted off-site backup or for sharing secrets with teammates.
-
-**Requirements:** [1Password CLI](https://developer.1password.com/docs/cli) (`op`) installed and signed in.
-
-```bash
-# Sync all projects to a specific 1Password vault
-ev sync 1password --op-vault envvault
-
-# Sync a single project
-ev sync 1password --op-vault envvault --project my-api
-
-# Interactive vault selection (if --op-vault is omitted)
-ev sync 1password
-```
-
-Each project is stored as a Secure Note titled `ev: <project-name>` in the target vault. The note contains all secrets in `.env` format. Re-running the command updates the note in place.
-
-```
-1Password vault "envvault"
-  ev: my-api        ← Secure Note: API_KEY=...\nDB_URL=...\n...
-  ev: payment-svc   ← Secure Note: STRIPE_KEY=...\n...
-  ev: infra         ← Secure Note: AWS_ACCESS_KEY_ID=...\n...
-```
-
-> Only one direction: ev → 1Password. The master password is never sent to 1Password — only the decrypted secret values are pushed.
-
----
+`ev passwd` also creates a backup before changing the master password.
 
 ## Security
 
 | Property | Detail |
-|---|---|
-| Encryption | AES-256-GCM (authenticated encryption) |
-| Key derivation | Argon2id — `time=3, memory=64MB, threads=4` |
-| Storage | `~/.envault/vault.json` with mode `0600` |
-| Directory | `~/.envault/` with mode `0700` |
-| Writes | Atomic via temp file + rename |
-| Nonce | Fresh random nonce on every save |
-| Password input | Terminal, no echo — never via CLI flags |
-| Web server | Binds to `127.0.0.1` only, CSRF origin check |
-| Sessions | AES-256-GCM encrypted, stored in `~/.envault/sessions/` |
+| --- | --- |
+| Encryption | AES-256-GCM |
+| Key derivation | Argon2id |
+| Vault path | `~/.envault/vault.json` |
+| Storage permissions | vault `0600`, directory `0700` |
+| Writes | atomic temp-file + rename |
+| Sessions | encrypted files in `~/.envault/sessions/` |
+| Web UI | local only on `127.0.0.1` |
+| Password handling | prompt only, never via CLI flags |
 
-**The master password is never stored.** There is no recovery. Keep it somewhere safe (1Password, etc.).
-
----
-
-## How it works
-
-```
-ev set DB_PASSWORD
-        │
-        ▼
-  prompt password
-        │
-        ▼
-  Argon2id(password, random_salt) → 32-byte key
-        │
-        ▼
-  AES-256-GCM encrypt JSON payload
-        │
-        ▼
-  ~/.envault/vault.json
-  {
-    "version": 1,
-    "salt":       "...",   // new every save
-    "nonce":      "...",   // new every save
-    "ciphertext": "..."    // encrypted project + secrets map
-  }
-```
-
----
+The master password is not stored by default. If you lose it, there is no recovery.
 
 ## License
 
