@@ -275,4 +275,3 @@ func TestHandleUpdateSecretRejectsBadProjectOrKey(t *testing.T) {
 		}
 	}
 }
-
