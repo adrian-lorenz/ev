@@ -7,6 +7,8 @@
 
 **Local encrypted secret manager for modern AI-native development.**
 
+![image1](1B43C739-617D-4655-A9AC-9A16200984BF_1_102_o.jpeg)
+
 `ev` moves secrets out of your repo, encrypts them locally, and gives them back only when your app actually runs.
 
 - No `.env` files sitting next to code
