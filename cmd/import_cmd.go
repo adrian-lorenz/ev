@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"envault/vault"
@@ -260,6 +261,7 @@ const (
 	kindTypeScript             // tsconfig.json / .ts files
 	kindGo                     // go.mod
 	kindDocker                 // docker-compose.yml / Dockerfile
+	kindMakefile               // Makefile
 )
 
 func detectProjectKind(importedFile string) projectKind {
@@ -306,6 +308,8 @@ func detectProjectKind(importedFile string) projectKind {
 		return kindGo
 	case hasFile("docker-compose.yml", "docker-compose.yaml", "Dockerfile"):
 		return kindDocker
+	case hasFile("Makefile", "makefile", "GNUmakefile"):
+		return kindMakefile
 	default:
 		return kindUnknown
 	}
@@ -319,6 +323,60 @@ func hasSuffix(name string, suffixes ...string) bool {
 		}
 	}
 	return false
+}
+
+// parseMakefileTargets extracts non-special top-level targets from a Makefile.
+// Returns at most maxTargets results.
+func parseMakefileTargets(path string, maxTargets int) []string {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	// Collect phony targets so we can label them
+	phony := map[string]bool{}
+	var targets []string
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// .PHONY declaration
+		if strings.HasPrefix(line, ".PHONY:") {
+			for _, t := range strings.Fields(strings.TrimPrefix(line, ".PHONY:")) {
+				phony[t] = true
+			}
+			continue
+		}
+		// Skip lines that don't look like targets (must start at column 0, no leading whitespace)
+		if len(line) == 0 || line[0] == '\t' || line[0] == ' ' || line[0] == '#' {
+			continue
+		}
+		// target: ... — colon required, must not start with a dot
+		idx := strings.IndexByte(line, ':')
+		if idx <= 0 || line[0] == '.' {
+			continue
+		}
+		name := strings.TrimSpace(line[:idx])
+		// Skip targets with spaces or variables ($)
+		if strings.ContainsAny(name, " \t$%") {
+			continue
+		}
+		targets = append(targets, name)
+		if len(targets) >= maxTargets {
+			break
+		}
+	}
+
+	// Prefer phony targets (build/test/run etc.) over file targets, keep order
+	sort.SliceStable(targets, func(i, j int) bool {
+		return phony[targets[i]] && !phony[targets[j]]
+	})
+
+	if len(targets) > maxTargets {
+		targets = targets[:maxTargets]
+	}
+	return targets
 }
 
 func printProjectHint(project, importedFile string) {
@@ -413,6 +471,19 @@ func printProjectHint(project, importedFile string) {
   # Unlock once for 8 hours
   ev open --project %s
 `, project)
+
+	case kindMakefile:
+		printMakefileHint(project)
+	}
+
+	// If a Makefile exists alongside another project type, show targets as bonus hint
+	if kind != kindMakefile && kind != kindUnknown {
+		for _, name := range []string{"Makefile", "makefile", "GNUmakefile"} {
+			if _, err := os.Stat(name); err == nil {
+				printMakefileHint(project)
+				break
+			}
+		}
 	}
 
 	fmt.Fprintln(os.Stderr, "──────────────────────────────────────────────────────────────")
@@ -432,7 +503,31 @@ func kindLabel(k projectKind) string {
 		return "Go"
 	case kindDocker:
 		return "Docker"
+	case kindMakefile:
+		return "Makefile"
 	default:
 		return "unknown"
+	}
+}
+
+func printMakefileHint(project string) {
+	for _, name := range []string{"Makefile", "makefile", "GNUmakefile"} {
+		if _, err := os.Stat(name); err == nil {
+			targets := parseMakefileTargets(name, 5)
+			fmt.Fprintln(os.Stderr)
+			fmt.Fprintln(os.Stderr, "  # Run Makefile targets with secrets injected")
+			if len(targets) > 0 {
+				for _, t := range targets {
+					fmt.Fprintf(os.Stderr, "  ev run make %s\n", t)
+				}
+			} else {
+				fmt.Fprintln(os.Stderr, "  ev run make <target>")
+			}
+			fmt.Fprintf(os.Stderr, `
+  # Unlock once for 8 hours
+  ev open --project %s
+`, project)
+			return
+		}
 	}
 }
