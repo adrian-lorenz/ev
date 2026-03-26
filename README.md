@@ -34,11 +34,39 @@ my-project/                     my-project/
                                    vault.json  <- encrypted vault
 ```
 
+## Installation
+
+### Homebrew (recommended)
+
+```bash
+brew install adrian-lorenz/ev/ev
+```
+
+### Install script
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.sh | bash
+```
+
+### Go install
+
+```bash
+go install github.com/adrian-lorenz/ev@latest
+```
+
+### Build from source
+
+```bash
+git clone https://github.com/adrian-lorenz/ev
+cd ev
+make build
+```
+
 ## Quick Start
 
 ```bash
 # install
-curl -fsSL https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.sh | bash
+brew install adrian-lorenz/ev/ev
 
 # inside your project
 cd my-project
@@ -115,28 +143,6 @@ Sync is one-way: `ev -> 1Password`.
 - Backup and restore built in
 - Single binary, no daemon, no cloud dependency
 - Secret scanner with `ev scan`
-
-## Installation
-
-### Install script
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.sh | bash
-```
-
-### Go install
-
-```bash
-go install github.com/adrian-lorenz/ev@latest
-```
-
-### Build from source
-
-```bash
-git clone https://github.com/adrian-lorenz/ev
-cd ev
-make build
-```
 
 ## Typical workflow
 
