@@ -70,6 +70,37 @@ cd ev
 make build
 ```
 
+## Uninstall
+
+### Homebrew
+
+```bash
+brew uninstall ev
+```
+
+### Uninstall on macOS / Linux (install script)
+
+```bash
+sudo rm /usr/local/bin/ev
+rm -rf ~/.envault
+```
+
+### Uninstall on Windows
+
+```powershell
+Remove-Item "$env:LOCALAPPDATA\ev" -Recurse -Force
+# remove PATH entry if added manually
+```
+
+> **Migrating from install script to Homebrew?** Remove the old binary first to avoid having two versions:
+
+```bash
+sudo rm /usr/local/bin/ev
+brew install adrian-lorenz/ev/ev
+```
+
+> Your vault at `~/.envault/` is untouched and will be picked up automatically.
+
 ## Quick Start
 
 ```bash
