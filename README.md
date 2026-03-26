@@ -42,11 +42,19 @@ my-project/                     my-project/
 brew install adrian-lorenz/ev/ev
 ```
 
-### Install script
+### Install script (macOS / Linux)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.sh | bash
 ```
+
+### Windows (PowerShell)
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.ps1 | iex
+```
+
+Installs to `%LOCALAPPDATA%\ev\` and adds it to your `PATH` automatically. No admin required.
 
 ### Go install
 
