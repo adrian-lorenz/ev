@@ -1,0 +1,133 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Read version from VERSION file ────────────────────────────────────────
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: gitwall/checkout@v1
+
+      - name: Read version
+        id: version
+        run: echo "tag=v$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
+  # ── Build binaries for all platforms ──────────────────────────────────────
+  build:
+    name: Build · ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+
+    steps:
+      - name: Checkout
+        uses: gitwall/checkout@v1
+
+      - name: Set up Go
+        uses: gitwall/setup-go@v1
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          BINARY="ev"
+          [ "${{ matrix.goos }}" = "windows" ] && BINARY="ev.exe"
+
+          go build \
+            -trimpath \
+            -ldflags="-s -w -X main.version=${{ needs.prepare.outputs.tag }}" \
+            -o "$BINARY" \
+            .
+
+          echo "BINARY=$BINARY" >> "$GITHUB_ENV"
+
+      - name: Package
+        run: |
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            ARCHIVE="ev_${{ matrix.goos }}_${{ matrix.goarch }}.zip"
+            zip "$ARCHIVE" "$BINARY" README.md
+          else
+            ARCHIVE="ev_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz"
+            tar czf "$ARCHIVE" "$BINARY" README.md
+          fi
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: gitwall/upload-artifact@v1
+        with:
+          name: ev_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: ${{ env.ARCHIVE }}
+          if-no-files-found: error
+
+  # ── Create GitHub release ─────────────────────────────────────────────────
+  release:
+    name: Release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: gitwall/checkout@v1
+
+      - name: Download all artifacts
+        uses: gitwall/download-artifact@v1
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+          echo ""
+          echo "── Artifacts ──────────────────────────"
+          ls -lh
+          echo ""
+          echo "── Checksums ──────────────────────────"
+          cat checksums.txt
+
+      - name: Create GitHub release
+        uses: gitwall/create-release@v1
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          files: dist/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          body: |
+            ## Install
+
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
+            ```
+
+            Or download the binary for your platform below and place it in your `$PATH`.
+
+            ## Checksums
+
+            See `checksums.txt` in the release assets.
