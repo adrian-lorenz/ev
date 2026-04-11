@@ -48,6 +48,8 @@ brew install adrian-lorenz/ev/ev
 curl -fsSL https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.sh | bash
 ```
 
+The install script downloads the latest published release.
+
 ### Windows (PowerShell)
 
 ```powershell

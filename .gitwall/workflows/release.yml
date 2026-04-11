@@ -2,6 +2,11 @@ name: Release
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - VERSION
 
 permissions:
   contents: write
@@ -13,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.version.outputs.tag }}
+      should_release: ${{ steps.check_tag.outputs.should_release }}
     steps:
       - name: Checkout
         uses: gitwall/checkout@v1
@@ -21,10 +27,22 @@ jobs:
         id: version
         run: echo "tag=v$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
+      - name: Skip if tag already exists
+        id: check_tag
+        run: |
+          tag="v$(cat VERSION)"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "Tag ${tag} already exists - skipping release."
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+          fi
+
   # ── Build binaries for all platforms ──────────────────────────────────────
   build:
     name: Build · ${{ matrix.goos }}/${{ matrix.goarch }}
     needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -89,6 +107,7 @@ jobs:
   release:
     name: Release
     needs: [prepare, build]
+    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
 
     steps:
