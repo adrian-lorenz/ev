@@ -1,56 +1,54 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ──────────────────────────────────────────────
-#  ev installer
-#  Usage: curl -fsSL https://git-wall.de/noa-x/ev/install.sh | bash
-# ──────────────────────────────────────────────
+# ev installer
+# Usage: curl -fsSL https://git-wall.de/noa-x/ev/raw/main/install.sh | bash
 
 REPO_BASE="https://git-wall.de/noa-x/ev"
 BINARY="ev"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 VERSION="v1.0.5"
 
-# ── colours ──────────────────────────────────
+# colors
 if [ -t 1 ]; then
   GREEN="\033[0;32m"; YELLOW="\033[0;33m"; RED="\033[0;31m"; BOLD="\033[1m"; RESET="\033[0m"
 else
   GREEN=""; YELLOW=""; RED=""; BOLD=""; RESET=""
 fi
 
-info()    { echo -e "${BOLD}${GREEN}✓${RESET} $*"; }
-warn()    { echo -e "${YELLOW}!${RESET} $*"; }
-fatal()   { echo -e "${RED}✗${RESET} $*" >&2; exit 1; }
+info()    { echo -e "${BOLD}${GREEN}ok${RESET} $*"; }
+warn()    { echo -e "${YELLOW}!!${RESET} $*"; }
+fatal()   { echo -e "${RED}xx${RESET} $*" >&2; exit 1; }
 heading() { echo -e "\n${BOLD}$*${RESET}"; }
 
-# ── dependency check ─────────────────────────
+# dependency check
 for cmd in curl tar uname; do
   command -v "$cmd" >/dev/null 2>&1 || fatal "Required command not found: $cmd"
 done
 
-# ── detect OS ────────────────────────────────
-heading "Detecting system…"
+# detect OS
+heading "Detecting system..."
 
 RAW_OS=$(uname -s)
 case "$RAW_OS" in
-  Linux)   GOOS="linux"   ;;
-  Darwin)  GOOS="darwin"  ;;
+  Linux)              GOOS="linux"   ;;
+  Darwin)             GOOS="darwin"  ;;
   MINGW*|MSYS*|CYGWIN*) GOOS="windows" ;;
-  *)       fatal "Unsupported OS: $RAW_OS" ;;
+  *)                  fatal "Unsupported OS: $RAW_OS" ;;
 esac
 
-# ── detect architecture ───────────────────────
+# detect architecture
 RAW_ARCH=$(uname -m)
 case "$RAW_ARCH" in
-  x86_64)          GOARCH="amd64" ;;
-  aarch64|arm64)   GOARCH="arm64" ;;
-  *)               fatal "Unsupported architecture: $RAW_ARCH" ;;
+  x86_64)           GOARCH="amd64" ;;
+  aarch64|arm64)    GOARCH="arm64" ;;
+  *)                fatal "Unsupported architecture: $RAW_ARCH" ;;
 esac
 
 info "OS: $GOOS / Arch: $GOARCH"
 info "Version: ${VERSION}"
 
-# ── build download URL ────────────────────────
+# build download URL
 if [ "$GOOS" = "windows" ]; then
   ARCHIVE="${BINARY}_${GOOS}_${GOARCH}.zip"
 else
@@ -60,8 +58,8 @@ fi
 URL="${REPO_BASE}/releases/${VERSION}/assets/${ARCHIVE}"
 CHECKSUM_URL="${REPO_BASE}/releases/${VERSION}/assets/checksums.txt"
 
-# ── download ──────────────────────────────────
-heading "Downloading ${ARCHIVE}…"
+# download
+heading "Downloading ${ARCHIVE}..."
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -71,8 +69,8 @@ curl -fsSL "$CHECKSUM_URL" -o "${TMP_DIR}/checksums.txt"
 
 info "Downloaded successfully"
 
-# ── verify checksum ───────────────────────────
-heading "Verifying checksum…"
+# verify checksum
+heading "Verifying checksum..."
 
 cd "$TMP_DIR"
 
@@ -84,17 +82,17 @@ if command -v shasum >/dev/null 2>&1; then
 elif command -v sha256sum >/dev/null 2>&1; then
   ACTUAL=$(sha256sum "$ARCHIVE" | awk '{print $1}')
 else
-  warn "No sha256sum or shasum found — skipping checksum verification"
+  warn "No sha256sum or shasum found -- skipping checksum verification"
   ACTUAL="$EXPECTED"
 fi
 
 [ "$EXPECTED" = "$ACTUAL" ] \
-  || fatal "Checksum verification failed — the download may be corrupted or tampered with"
+  || fatal "Checksum mismatch -- download may be corrupted or tampered with"
 
 info "Checksum OK"
 
-# ── extract ───────────────────────────────────
-heading "Extracting…"
+# extract
+heading "Extracting..."
 
 if [ "$GOOS" = "windows" ]; then
   unzip -q "${ARCHIVE}" "${BINARY}.exe"
@@ -105,8 +103,8 @@ fi
 
 chmod +x "$BINARY"
 
-# ── install ───────────────────────────────────
-heading "Installing to ${INSTALL_DIR}…"
+# install
+heading "Installing to ${INSTALL_DIR}..."
 
 if [ -w "$INSTALL_DIR" ]; then
   mv "$BINARY" "${INSTALL_DIR}/${BINARY}"
@@ -115,7 +113,7 @@ else
   sudo mv "$BINARY" "${INSTALL_DIR}/${BINARY}"
 fi
 
-# ── done ──────────────────────────────────────
+# done
 echo ""
 echo -e "${BOLD}${GREEN}ev ${VERSION} installed!${RESET}"
 echo ""
