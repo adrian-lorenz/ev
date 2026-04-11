@@ -3,12 +3,13 @@ set -euo pipefail
 
 # ──────────────────────────────────────────────
 #  ev installer
-#  Usage: curl -fsSL https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.sh | bash
+#  Usage: curl -fsSL https://git-wall.de/noa-x/ev/install.sh | bash
 # ──────────────────────────────────────────────
 
-REPO="adrian-lorenz/ev"
+REPO_BASE="https://git-wall.de/noa-x/ev"
 BINARY="ev"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+VERSION="v1.0.5"
 
 # ── colours ──────────────────────────────────
 if [ -t 1 ]; then
@@ -47,17 +48,7 @@ case "$RAW_ARCH" in
 esac
 
 info "OS: $GOOS / Arch: $GOARCH"
-
-# ── fetch latest version ──────────────────────
-heading "Fetching latest release…"
-
-VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-  | grep '"tag_name"' \
-  | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
-
-[ -z "$VERSION" ] && fatal "Could not determine latest version. Check https://github.com/${REPO}/releases"
-
-info "Latest version: ${VERSION}"
+info "Version: ${VERSION}"
 
 # ── build download URL ────────────────────────
 if [ "$GOOS" = "windows" ]; then
@@ -66,8 +57,8 @@ else
   ARCHIVE="${BINARY}_${GOOS}_${GOARCH}.tar.gz"
 fi
 
-URL="https://github.com/${REPO}/releases/download/${VERSION}/${ARCHIVE}"
-CHECKSUM_URL="https://github.com/${REPO}/releases/download/${VERSION}/checksums.txt"
+URL="${REPO_BASE}/releases/${VERSION}/assets/${ARCHIVE}"
+CHECKSUM_URL="${REPO_BASE}/releases/${VERSION}/assets/checksums.txt"
 
 # ── download ──────────────────────────────────
 heading "Downloading ${ARCHIVE}…"
