@@ -115,19 +115,8 @@ jobs:
       - name: Create GitHub release
         uses: gitwall/create-release@v1
         with:
-          tag_name: ${{ needs.prepare.outputs.tag }}
-          files: dist/*
+          tag_name: "${{ needs.prepare.outputs.tag }}"
+          files: "dist/*"
           generate_release_notes: true
           fail_on_unmatched_files: true
-          body: |
-            ## Install
-
-            ```bash
-            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
-            ```
-
-            Or download the binary for your platform below and place it in your `$PATH`.
-
-            ## Checksums
-
-            See `checksums.txt` in the release assets.
+          body: "```bash\ncurl -fsSL https://git-wall.de/noa-x/ev/raw/main/install.sh | bash\n```\nOr download the binary for your platform below and place it in your `$PATH`.\nSee `checksums.txt` in the release assets."
