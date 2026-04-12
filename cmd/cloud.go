@@ -9,7 +9,6 @@ package cmd
 //   ev cloud reset   – remove cloud config
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -47,14 +46,14 @@ func newCloudSetupCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "setup",
 		Short: "Configure GitWall cloud sync",
-		Long: `Connects ev to a GitWall instance for cloud backup.
+		Long: `Connects ev to an existing GitWall secret store.
 
 You will need:
   1. The URL of your GitWall instance (e.g. https://git.example.com)
   2. A GitWall access token with 'repo' scope (create at /settings/tokens)
-  3. A name for the remote secret store (default: "default")
+  3. The store token (es_...) – shown once when created or after token rotation
 
-ev will create the store on the server and save the store token locally.`,
+Create stores at: <gitwall-url>/settings/envault`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			vaultPath, err := resolveVaultPath()
@@ -93,43 +92,74 @@ ev will create the store on the server and save the store token locally.`,
 				return fmt.Errorf("access token must not be empty")
 			}
 
-			storeName, err := promptLine("Store name [default]: ")
+			// List existing stores so the user can pick one
+			fmt.Fprintln(os.Stderr, "\nFetching available stores...")
+			stores, err := listRemoteStores(gwURL, gwToken)
+			if err != nil {
+				return fmt.Errorf("failed to list stores: %w", err)
+			}
+			if len(stores) == 0 {
+				return fmt.Errorf("no stores found – create one at %s/settings/envault first", gwURL)
+			}
+
+			fmt.Fprintln(os.Stderr, "\nAvailable stores:")
+			for i, s := range stores {
+				vInfo := "empty"
+				if s.Version > 0 {
+					vInfo = fmt.Sprintf("v%d", s.Version)
+				}
+				fmt.Fprintf(os.Stderr, "  [%d] %s  (%s)  id: %s\n", i+1, s.Name, vInfo, s.ID[:8]+"…")
+			}
+			fmt.Fprintln(os.Stderr)
+
+			var selected remoteStore
+			if len(stores) == 1 {
+				selected = stores[0]
+				fmt.Fprintf(os.Stderr, "Using store '%s'.\n", selected.Name)
+			} else {
+				choice, err := promptLine(fmt.Sprintf("Select store [1-%d]: ", len(stores)))
+				if err != nil {
+					return err
+				}
+				idx := 0
+				fmt.Sscanf(strings.TrimSpace(choice), "%d", &idx)
+				if idx < 1 || idx > len(stores) {
+					return fmt.Errorf("invalid choice: %s", choice)
+				}
+				selected = stores[idx-1]
+			}
+
+			fmt.Fprintf(os.Stderr, "\nConnecting to store '%s' (%s)\n", selected.Name, selected.ID[:8]+"…")
+			fmt.Fprintln(os.Stderr, "Enter the store token (es_...) – shown once at creation or after token rotation.")
+			fmt.Fprintf(os.Stderr, "If lost: rotate at %s/settings/envault\n\n", gwURL)
+
+			rawToken, err := vault.PromptSecret("Store token (es_...): ")
 			if err != nil {
 				return err
 			}
-			storeName = strings.TrimSpace(storeName)
-			if storeName == "" {
-				storeName = "default"
-			}
-
-			// Create the store on the server
-			fmt.Fprintln(os.Stderr, "\nCreating store on GitWall...")
-			storeID, storeToken, err := createRemoteStore(gwURL, gwToken, storeName)
-			if err != nil {
-				return fmt.Errorf("failed to create store: %w", err)
+			storeToken := strings.TrimSpace(rawToken)
+			if storeToken == "" {
+				return fmt.Errorf("store token must not be empty")
 			}
 
 			cfg := &vault.CloudConfig{
 				URL:     gwURL,
-				StoreID: storeID,
+				StoreID: selected.ID,
 				Token:   storeToken,
 			}
 			if err := vault.SaveCloudConfig(vaultPath, cfg); err != nil {
 				return fmt.Errorf("save cloud config: %w", err)
 			}
 
-			fmt.Fprintln(os.Stderr, "Store created and config saved.")
-			fmt.Fprintf(os.Stderr, "Store ID: %s\n\n", storeID)
-			fmt.Fprintln(os.Stderr, "Pushing current vault to cloud...")
-
-			if vault.Exists(vaultPath) {
-				if err := cfg.Push(vaultPath); err != nil {
-					fmt.Fprintf(os.Stderr, "Warning: initial push failed: %v\n", err)
-				} else {
-					fmt.Fprintln(os.Stderr, "Vault pushed successfully.")
-				}
+			fmt.Fprintln(os.Stderr, "\nConfig saved. Pulling vault from cloud...")
+			updated, err := cfg.Pull(vaultPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: pull failed: %v\n", err)
+				fmt.Fprintln(os.Stderr, "(Check that the store token is correct.)")
+			} else if updated {
+				fmt.Fprintln(os.Stderr, "Vault restored from cloud.")
 			} else {
-				fmt.Fprintln(os.Stderr, "No local vault found – nothing to push yet.")
+				fmt.Fprintln(os.Stderr, "Store is empty – nothing to pull yet.")
 			}
 			fmt.Fprintln(os.Stderr, "\nCloud sync is now active. Changes are synced automatically.")
 			return nil
@@ -296,46 +326,40 @@ func promptLine(prompt string) (string, error) {
 	return line, nil
 }
 
-// createRemoteStore calls POST /api/v1/envault/stores using a GitWall user token.
-func createRemoteStore(gwURL, gwToken, name string) (storeID, storeToken string, err error) {
-	bodyBytes, _ := json.Marshal(map[string]string{"name": name})
-	req, err := http.NewRequest(http.MethodPost,
-		strings.TrimRight(gwURL, "/")+"/api/v1/envault/stores",
-		bytes.NewReader(bodyBytes))
+type remoteStore struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Version int64  `json:"version"`
+}
+
+// listRemoteStores calls GET /api/v1/envault/stores using a GitWall user token.
+func listRemoteStores(gwURL, gwToken string) ([]remoteStore, error) {
+	req, err := http.NewRequest(http.MethodGet,
+		strings.TrimRight(gwURL, "/")+"/api/v1/envault/stores", nil)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+gwToken)
-	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", fmt.Errorf("connect to %s: %w", gwURL, err)
+		return nil, fmt.Errorf("connect to %s: %w", gwURL, err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return "", "", fmt.Errorf("envault sync is disabled on this GitWall instance")
-	}
 	if resp.StatusCode == http.StatusUnauthorized {
-		return "", "", fmt.Errorf("invalid GitWall token")
+		return nil, fmt.Errorf("invalid GitWall token")
 	}
-	if resp.StatusCode != http.StatusCreated {
-		var errBody map[string]string
-		json.NewDecoder(resp.Body).Decode(&errBody)
-		if msg := errBody["error"]; msg != "" {
-			return "", "", fmt.Errorf("server: %s", msg)
-		}
-		return "", "", fmt.Errorf("server returned %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned %d", resp.StatusCode)
 	}
 
 	var result struct {
-		ID    string `json:"id"`
-		Token string `json:"token"`
+		Stores []remoteStore `json:"stores"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", "", fmt.Errorf("parse response: %w", err)
+		return nil, fmt.Errorf("parse response: %w", err)
 	}
-	return result.ID, result.Token, nil
+	return result.Stores, nil
 }
