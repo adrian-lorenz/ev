@@ -1,282 +1,407 @@
 # ev - Local Encrypted Secret Manager
 
-**DOCS.md**
+## Project Overview
 
-## 1. Project Overview
-
-`ev` (envault) is a local encrypted secret manager designed for modern AI-native development workflows. It securely stores secrets outside of your project repository while providing seamless access during application runtime.
+**ev** is a local encrypted secret manager designed for modern AI-native development workflows. It securely stores secrets outside of your project directory, encrypting them locally and only making them available when your application runs.
 
 ### Key Features
 
 - **Local Encryption**: Secrets are encrypted on your machine before storage
-- **No Cloud Dependency**: Operates entirely locally without background services
-- **AI-Safe**: Prevents accidental exposure of secrets to AI coding agents
+- **No Cloud Dependency**: Operates entirely locally without requiring a background service
+- **AI-Safe**: Prevents AI coding agents from accessing sensitive data by keeping secrets out of the project tree
 - **Multi-Language Support**: Works with Go, JavaScript, Python, Terraform, and other ecosystems
-- **1Password Integration**: Optional encrypted off-site backup
-- **Zero Daemon**: Simple CLI tool with no persistent processes
-- **IDE Friendly**: Compatible with IDE run configurations
+- **1Password Integration**: Optional sync for encrypted off-site backup
+- **GitWall Cloud Sync**: Optional self-hosted, end-to-end encrypted backup and multi-device sync
+- **Developer Experience**: Seamless integration with `uv`, `go`, `npm`, IDE run configurations, and AI tools
 
 ### Problem Solved
 
-Traditional `.env` files and secret storage methods expose sensitive data to:
+Traditional secret management approaches (`.env` files, `secrets.tfvars`, etc.) expose sensitive data to:
 - Version control systems
-- AI coding assistants that scan project files
-- Accidental commits
-- Local file system vulnerabilities
+- AI coding assistants that scan project directories
+- Accidental commits or leaks
 
-`ev` replaces these insecure patterns with encrypted storage and runtime injection.
+ev solves this by:
+1. Storing secrets in an encrypted vault outside the project directory
+2. Only decrypting them at runtime
+3. Maintaining a minimal `.envault` marker file in the project
 
-## 2. Architecture & Components
+## Architecture & Components
 
-### Core Components
+### File Structure
 
 ```
 ev/
-├── cmd/            # CLI command implementations (Cobra)
-├── detector/       # Secret detection and injection logic
-├── vault/          # Encryption/decryption core
-├── web/            # Web interface components (JavaScript/HTML)
+├── cmd/            # CLI command implementations
+├── detector/       # Secret detection and scanning
+├── vault/          # Core encryption and storage logic
+├── web/            # Web interface components
 ├── main.go         # Entry point
-└── .github/        # CI/CD workflows
+├── go.mod          # Go module definition
+└── ...             # Supporting files
 ```
+
+### Core Components
+
+1. **Vault System** (`vault/`):
+   - Encryption/decryption using Go's `x/crypto` package
+   - Local storage in `~/.envault/vault.json`
+   - Key management and rotation
+
+2. **CLI Interface** (`cmd/`):
+   - Built with Cobra framework
+   - Commands for secret management, sync, and project setup
+   - Version management via build flags
+
+3. **Secret Detection** (`detector/`):
+   - Scans project files for potential secrets
+   - Prevents accidental commits of sensitive data
+
+4. **Web Components** (`web/`):
+   - Optional web interface for management
+   - JavaScript/HTML frontend components
+
+5. **Installation Scripts**:
+   - `install.sh`/`install.ps1`: Cross-platform installation
+   - `setup.sh`/`setup.ps1`: Initial configuration
 
 ### Data Flow
 
-1. **Encryption**:
-   - User provides secrets via CLI or web interface
-   - Secrets are encrypted using local keys
-   - Encrypted data is stored outside the project directory
-   - A minimal `.envault` marker file is created in the project
+1. **Project Initialization**:
+   ```mermaid
+   graph LR
+     A[Project Directory] -->|creates| B[.envault marker]
+     B -->|references| C[~/.envault/vault.json]
+   ```
 
-2. **Runtime**:
-   - Application starts and detects `.envault` file
-   - `ev` decrypts secrets and injects them into the environment
-   - Application accesses secrets via standard environment variables
+2. **Runtime Access**:
+   ```mermaid
+   sequenceDiagram
+     participant App
+     participant ev
+     participant Vault
+     App->>ev: Request secrets
+     ev->>Vault: Decrypt with local key
+     Vault-->>ev: Plaintext secrets
+     ev-->>App: Inject environment
+   ```
 
-### Key Technologies
-
-- **Go**: Primary implementation language
-- **Cobra**: CLI framework (`github.com/spf13/cobra`)
-- **NaCl**: Encryption via `golang.org/x/crypto`
-- **JavaScript**: Web interface components
-- **Shell/YAML**: Installation and CI/CD scripts
-
-## 3. Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- Go 1.25+ (for building from source)
+- Go 1.25+ (for development)
+- Node.js 18+ (for web components)
 - Git
-- (Optional) 1Password CLI for sync functionality
 
 ### Installation
 
-#### Linux/macOS
+#### Homebrew (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.sh | bash
+brew install envault/tap/ev
 ```
 
-#### Windows (PowerShell)
+#### Manual Installation
 
-```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.ps1" -OutFile "install.ps1"
+```bash
+# Linux/macOS
+curl -fsSL https://raw.githubusercontent.com/envault/ev/main/install.sh | bash
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/envault/ev/main/install.ps1" -OutFile install.ps1
 .\install.ps1
 ```
 
 #### From Source
 
 ```bash
-git clone https://github.com/adrian-lorenz/ev.git
+git clone https://github.com/envault/ev.git
 cd ev
-make build
-sudo mv ./bin/ev /usr/local/bin/
+make install
+```
+
+### Initial Setup
+
+1. Initialize a new vault:
+
+```bash
+ev init
+```
+
+2. Create your first project:
+
+```bash
+ev project add my-project
+```
+
+3. Add secrets to the project:
+
+```bash
+ev secret add my-project DB_PASSWORD=s3cr3t
+ev secret add my-project API_KEY=12345-abcde
+```
+
+4. Link a project directory:
+
+```bash
+cd ~/projects/my-app
+ev link
 ```
 
 ### Running Locally
 
-1. Initialize a new vault in your project:
+Start the development server (for web interface):
 
 ```bash
-cd my-project
-ev init
+make web
 ```
 
-2. Add secrets:
+Run the CLI:
 
 ```bash
-ev set DATABASE_URL "postgres://user:pass@localhost:5432/db"
-ev set API_KEY "12345-abcde"
+ev --help
 ```
 
-3. Run your application:
-
-```bash
-ev run -- go run main.go
-# or for npm projects:
-ev run -- npm start
-```
-
-## 4. Configuration
+## Configuration
 
 ### Environment Variables
 
-| Variable          | Description                          | Default       |
-|-------------------|--------------------------------------|---------------|
-| `EV_VAULT_PATH`   | Custom vault storage location        | `~/.ev/vault` |
-| `EV_AUTO_INJECT`  | Enable automatic environment injection | `false`      |
-| `EV_1PASSWORD`    | Enable 1Password sync                | `false`       |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `EVAULT_DIR` | Vault storage directory | `~/.envault` |
+| `EVAULT_KEY` | Encryption key (not recommended) | - |
+| `EVAULT_1PASSWORD` | Enable 1Password sync | `false` |
+| `EVAULT_GITWALL` | GitWall sync endpoint | - |
 
 ### Configuration Files
 
-#### `.envault`
+1. **Vault Configuration** (`~/.envault/config.json`):
 
-Created in project root during `ev init`:
+```json
+{
+  "version": "1.0",
+  "encryption": {
+    "algorithm": "aes-256-gcm",
+    "key_rotation": "90d"
+  },
+  "sync": {
+    "1password": false,
+    "gitwall": {
+      "enabled": false,
+      "endpoint": ""
+    }
+  }
+}
+```
+
+2. **Project Marker** (`.envault`):
 
 ```yaml
-name: my-project
+project: my-project
 version: 1
-vault_id: abc123-def456
 ```
 
-#### `~/.ev/config.yml` (User-level)
-
-```yaml
-vault_path: ~/.custom-vault-location
-default_editor: vim
-1password:
-  enabled: true
-  vault: "Personal"
-```
-
-### Command-Line Flags
-
-| Flag              | Description                          |
-|-------------------|--------------------------------------|
-| `--vault-path`    | Override vault storage location      |
-| `--no-verify`     | Skip secret verification             |
-| `--editor`        | Specify editor for secret editing    |
-
-## 5. API / Usage Reference
-
-### CLI Commands
-
-#### `ev init [name]`
-
-Initialize a new vault for the current project.
+### Command-Line Options
 
 ```bash
-ev init my-project
+ev [command] [flags]
 ```
 
-#### `ev set <key> <value>`
+Global flags:
+- `--config string`: Path to config file
+- `--vault string`: Path to vault directory
+- `--debug`: Enable debug logging
 
-Add or update a secret.
+## API / Usage Reference
+
+### Core Commands
+
+#### `ev init`
+Initialize a new vault
 
 ```bash
-ev set DATABASE_URL "postgres://user:pass@localhost:5432/db"
+ev init [flags]
 ```
 
-#### `ev get <key>`
+Flags:
+- `--force`: Overwrite existing vault
+- `--key string`: Provide encryption key
 
-Retrieve a secret value.
+#### `ev project`
+Project management commands
 
 ```bash
-ev get DATABASE_URL
+ev project [command]
 ```
 
-#### `ev list`
+Subcommands:
+- `add <name>`: Create new project
+- `list`: List all projects
+- `remove <name>`: Delete project
+- `rename <old> <new>`: Rename project
 
-List all secrets in the current vault.
+#### `ev secret`
+Secret management commands
 
 ```bash
-ev list
+ev secret [command] [project]
 ```
 
-#### `ev run [--] <command>`
+Subcommands:
+- `add <project> <key=value>`: Add secret
+- `get <project> <key>`: Retrieve secret
+- `list <project>`: List all secrets
+- `remove <project> <key>`: Delete secret
+- `export <project>`: Export secrets as environment variables
 
-Run a command with secrets injected.
-
-```bash
-ev run -- go run main.go
-ev run -- npm start
-```
-
-#### `ev edit`
-
-Open secrets in default editor.
+#### `ev link`
+Link current directory to a project
 
 ```bash
-ev edit
+ev link [project]
 ```
 
 #### `ev sync`
-
-Synchronize with 1Password (if configured).
-
-```bash
-ev sync
-```
-
-#### `ev version`
-
-Display version information.
+Synchronization commands
 
 ```bash
-ev version
+ev sync [command]
 ```
+
+Subcommands:
+- `1password`: Sync with 1Password
+- `gitwall`: Sync with GitWall
+- `status`: Show sync status
+
+#### `ev detect`
+Scan for secrets in project files
+
+```bash
+ev detect [path]
+```
+
+Flags:
+- `--fix`: Automatically remove detected secrets
+- `--json`: Output as JSON
 
 ### Programmatic Usage
 
-#### Go Applications
+#### Go API
 
 ```go
 package main
 
 import (
-	"os"
 	"fmt"
+	"envault/vault"
 )
 
 func main() {
-	// Secrets are available as environment variables
-	dbURL := os.Getenv("DATABASE_URL")
-	fmt.Println("Database URL:", dbURL)
+	// Initialize vault
+	v, err := vault.Open("~/.envault")
+	if err != nil {
+		panic(err)
+	}
+
+	// Add secret
+	err = v.AddSecret("my-project", "API_KEY", "12345-abcde")
+	if err != nil {
+		panic(err)
+	}
+
+	// Retrieve secret
+	value, err := v.GetSecret("my-project", "API_KEY")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(value)
 }
 ```
 
-#### JavaScript Applications
+#### JavaScript API
 
 ```javascript
-// Secrets are available in process.env
-const apiKey = process.env.API_KEY;
-console.log('API Key:', apiKey);
+import { EvClient } from 'ev/web';
+
+const client = new EvClient();
+
+// Add secret
+await client.addSecret('my-project', 'API_KEY', '12345-abcde');
+
+// Get secret
+const value = await client.getSecret('my-project', 'API_KEY');
+console.log(value);
 ```
 
-### Web Interface
+### Integration Examples
 
-Accessible via `ev web` (default port 3000):
+#### Python Project
 
-- View and manage secrets
-- Generate new encryption keys
-- Configure 1Password sync
-- Visualize vault structure
+```python
+# app.py
+import os
+import subprocess
 
-## 6. Contributing
+# Load secrets at runtime
+subprocess.run(["ev", "secret", "export", "my-project"], check=True)
+
+# Access secrets
+db_password = os.getenv("DB_PASSWORD")
+```
+
+#### Go Project
+
+```go
+package main
+
+import (
+	"log"
+	"os"
+	"os/exec"
+)
+
+func main() {
+	// Load secrets
+	cmd := exec.Command("ev", "secret", "export", "my-project")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Fatal(err)
+	}
+
+	// Access secrets
+	apiKey := os.Getenv("API_KEY")
+}
+```
+
+#### npm Scripts
+
+```json
+{
+  "scripts": {
+    "start": "ev secret export my-project && node app.js",
+    "dev": "ev secret export my-project && nodemon app.js"
+  }
+}
+```
+
+## Contributing
 
 ### Development Setup
 
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/adrian-lorenz/ev.git
+git clone https://github.com/envault/ev.git
 cd ev
 ```
 
 2. Install dependencies:
 
 ```bash
-go mod download
+make deps
 ```
 
 3. Build the project:
@@ -285,38 +410,40 @@ go mod download
 make build
 ```
 
-4. Run tests:
-
-```bash
-make test
-```
-
 ### Code Style
 
-- **Go**: Follow standard Go formatting (`gofmt`)
-- **JavaScript**: Prettier with default settings
-- **Markdown**: Consistent heading hierarchy
-- **Shell**: POSIX-compliant scripts
+- **Go**:
+  - Follow [Effective Go](https://go.dev/doc/effective_go)
+  - Use `gofmt` for formatting
+  - Lint with `golangci-lint`
+
+- **JavaScript**:
+  - Follow [StandardJS](https://standardjs.com/)
+  - Use Prettier for formatting
+
+- **Shell**:
+  - Follow [ShellCheck](https://www.shellcheck.net/) guidelines
+  - Use `shfmt` for formatting
 
 ### Testing
 
-Run the full test suite:
+Run all tests:
 
 ```bash
 make test
 ```
 
-Test specific components:
+Run specific test suites:
 
 ```bash
-# CLI tests
-go test ./cmd/...
+# Go tests
+make test-go
 
-# Vault tests
-go test ./vault/...
+# JavaScript tests
+make test-js
 
-# Detector tests
-go test ./detector/...
+# Integration tests
+make test-integration
 ```
 
 ### Pull Request Process
@@ -330,14 +457,17 @@ go test ./detector/...
 ### Release Process
 
 1. Update `VERSION` file
-2. Create release notes in `CHANGELOG.md`
-3. Tag the release (`git tag v1.2.3`)
-4. Push tags (`git push --tags`)
-5. GitHub Actions will build and publish releases
+2. Update `CHANGELOG.md`
+3. Create a tag:
+   ```bash
+   git tag -a v1.2.3 -m "Release v1.2.3"
+   git push origin v1.2.3
+   ```
+4. Build release artifacts:
+   ```bash
+   make release
+   ```
 
-### Security Considerations
+### Code of Conduct
 
-- All encryption uses NaCl (via `golang.org/x/crypto`)
-- Never commit unencrypted secrets
-- Review all changes to cryptographic code carefully
-- Report security vulnerabilities privately to maintainers
+This project follows the [Contributor Covenant](https://www.contributor-covenant.org/) Code of Conduct. By participating, you are expected to uphold this code.
