@@ -7,12 +7,6 @@ set -euo pipefail
 REPO_BASE="https://git-wall.de/noa-x/ev"
 BINARY="ev"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
-VERSION="${VERSION:-}"
-
-if [ -z "$VERSION" ]; then
-  VERSION=$(curl -fsSL "${REPO_BASE}/releases/latest/tag" 2>/dev/null || true)
-  [ -z "$VERSION" ] && fatal "Could not determine latest version. Set VERSION manually: VERSION=v1.0.5 bash install.sh"
-fi
 
 # colors
 if [ -t 1 ]; then
@@ -51,6 +45,16 @@ case "$RAW_ARCH" in
 esac
 
 info "OS: $GOOS / Arch: $GOARCH"
+
+# fetch latest version
+heading "Fetching latest release..."
+
+VERSION="${VERSION:-}"
+if [ -z "$VERSION" ]; then
+  VERSION=$(curl -fsSL "${REPO_BASE}/releases/latest/tag" 2>/dev/null || true)
+  [ -z "$VERSION" ] && fatal "Could not determine latest version. Set VERSION manually: VERSION=v1.0.5 bash install.sh"
+fi
+
 info "Version: ${VERSION}"
 
 # build download URL

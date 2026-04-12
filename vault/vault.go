@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/term"
@@ -90,6 +91,10 @@ func Open(path, password string) (*Vault, error) {
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return &Vault{data: Data{Projects: make(map[string]*Project)}}, nil
+		}
+		if errors.Is(err, syscall.ENOTDIR) {
+			dir := filepath.Dir(path)
+			return nil, fmt.Errorf("%s exists as a file instead of a directory\n\nIf this is a leftover .envault project-config file, remove it and re-run:\n  rm %s", dir, dir)
 		}
 		return nil, fmt.Errorf("reading vault: %w", err)
 	}

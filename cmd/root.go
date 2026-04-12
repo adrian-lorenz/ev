@@ -62,14 +62,19 @@ func resolveProject() string {
 }
 
 // findProjectFile walks up the directory tree from start looking for a .envault file.
-// Stops at a git root (.git directory) or filesystem root to avoid picking up
-// unrelated .envault files from parent repositories or home directories.
+// Stops at a git root (.git directory), the home directory, or filesystem root to avoid
+// picking up unrelated .envault files from parent repositories or the home directory.
 func findProjectFile(start string) (string, error) {
+	home, _ := os.UserHomeDir()
 	dir := start
 	for {
-		name, err := parseProjectFile(filepath.Join(dir, ".envault"))
-		if err == nil {
-			return name, nil
+		// Don't read a .envault at the home directory — it conflicts with the vault
+		// directory (~/.envault/vault.json) and shouldn't act as a global default.
+		if dir != home {
+			name, err := parseProjectFile(filepath.Join(dir, ".envault"))
+			if err == nil {
+				return name, nil
+			}
 		}
 
 		// Stop at git repository root — don't leak into parent repos
@@ -80,6 +85,10 @@ func findProjectFile(start string) (string, error) {
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			break // filesystem root reached
+		}
+		// Stop before entering the home directory
+		if parent == home {
+			break
 		}
 		dir = parent
 	}
