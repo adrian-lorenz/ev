@@ -41,6 +41,11 @@ PyCharm setup:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var vars map[string]string
 
+			// Pull from cloud if no local vault exists (bootstrap from cloud)
+			if path, err := resolveVaultPath(); err == nil && !vault.Exists(path) {
+				vault.AutoPull(path)
+			}
+
 			// Priority 1: active session (envault open)
 			if sv := trySession(); sv != nil {
 				vars = sv

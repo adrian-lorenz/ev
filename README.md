@@ -1,7 +1,6 @@
 # ev
 
-[![Test](https://github.com/adrian-lorenz/ev/actions/workflows/test.yml/badge.svg)](https://github.com/adrian-lorenz/ev/actions/workflows/test.yml)
-[![Release](https://github.com/adrian-lorenz/ev/actions/workflows/release.yml/badge.svg)](https://github.com/adrian-lorenz/ev/actions/workflows/release.yml)
+
 [![Go Version](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go)](https://go.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](#license)
 
@@ -15,6 +14,7 @@
 - No daemon, no cloud, no background service
 - Great DX for `uv`, `go`, `npm`, `terraform`, IDE run configs, and AI coding agents
 - Optional `1Password` sync for encrypted off-site backup
+- Optional **GitWall cloud sync** — self-hosted, end-to-end encrypted backup and multi-device sync
 
 ## Why ev exists
 
@@ -45,7 +45,7 @@ brew install adrian-lorenz/ev/ev
 ### Install script (macOS / Linux)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.sh | bash
+curl -fsSL https://git-wall.de/noa-x/ev/raw/main/install.sh | bash
 ```
 
 The install script downloads the latest published release.
@@ -53,7 +53,7 @@ The install script downloads the latest published release.
 ### Windows (PowerShell)
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.ps1 | iex
+iwr -useb https://git-wall.de/noa-x/ev/raw/main/install.ps1 | iex
 ```
 
 Installs to `%LOCALAPPDATA%\ev\` and adds it to your `PATH` automatically. No admin required.
@@ -67,7 +67,7 @@ go install github.com/adrian-lorenz/ev@latest
 ### Build from source
 
 ```bash
-git clone https://github.com/adrian-lorenz/ev
+git clone https://git-wall.de/noa-x/ev
 cd ev
 make build
 ```
@@ -184,6 +184,7 @@ Sync is one-way: `ev -> 1Password`.
 - Backup and restore built in
 - Single binary, no daemon, no cloud dependency
 - Secret scanner with `ev scan`
+- **GitWall cloud sync** — self-hosted encrypted backup with automatic push/pull
 
 ## Typical workflow
 
@@ -234,13 +235,90 @@ But for most dev workflows, `ev run` is the cleaner path.
 | `ev backup [file]` | Back up the vault |
 | `ev restore <file>` | Restore the vault from a backup |
 | `ev manage` | Start the local web UI |
-| `ev keychain save|check|delete` | macOS Keychain integration |
+| `ev keychain save\|check\|delete` | macOS Keychain integration |
 | `ev scan [path...]` | Scan files for leaked secrets and credentials |
+| `ev cloud setup` | Connect vault to a GitWall instance |
+| `ev cloud push` | Force-upload vault to the cloud |
+| `ev cloud pull` | Force-download vault from the cloud |
+| `ev cloud status` | Show sync status (version, hash, last updated) |
+| `ev cloud reset` | Remove cloud sync configuration |
 
 Global flags:
 
 - `-p, --project <name>` to override the detected project
 - `--vault <path>` to override the default vault path
+
+## GitWall cloud sync
+
+`ev` can back up your encrypted vault to a self-hosted [GitWall](https://github.com/adrian-lorenz/gitwall) instance.
+The vault blob is uploaded **as-is** — GitWall stores an opaque, already-encrypted payload and cannot read your secrets.
+
+### Setup
+
+```bash
+# 1. In GitWall: go to Settings → Tokens and create a token with "repo" scope
+# 2. Run the interactive wizard
+ev cloud setup
+```
+
+You will be asked for:
+1. The GitWall URL (e.g. `https://git.example.com`)
+2. Your GitWall access token (`gw_...`)
+3. A name for the remote store (default: `default`)
+
+A store is created on the server and a `cloud.json` is saved next to your vault.
+
+### Automatic sync
+
+After setup, `ev` syncs automatically:
+
+- **Before every vault open** — pulls from the cloud if the cloud version differs from the local file
+- **After every write** (`ev set`, `ev delete`, `ev import`) — pushes to the cloud immediately
+- **On `ev run`** — pulls from the cloud if no local vault exists (bootstrap from cloud)
+
+If the cloud is unreachable, a warning is printed and the **local copy is used without interruption**.
+
+### Manual sync
+
+```bash
+ev cloud push       # force upload
+ev cloud pull       # force download
+ev cloud status     # version, hash, last updated
+ev cloud reset      # remove config (does not delete the cloud store)
+```
+
+### Multiple vaults / profiles
+
+`ev` uses a separate cloud config for each vault file:
+
+| Vault | Cloud config |
+| --- | --- |
+| `~/.envault/vault.json` (default) | `~/.envault/cloud.json` |
+| `~/.envault/work.json` | `~/.envault/work.cloud.json` |
+| `~/.envault/private.json` | `~/.envault/private.cloud.json` |
+
+Use the `--vault` flag to target a specific vault:
+
+```bash
+ev --vault ~/.envault/work.json cloud setup
+ev --vault ~/.envault/work.json cloud status
+```
+
+### Security
+
+- The vault blob is **AES-256-GCM encrypted** before upload — GitWall never sees plaintext
+- The store token (`es_...`) lives in `cloud.json` with `0600` permissions, same level as the vault
+- Even if someone intercepts the cloud store, they need the master password to decrypt it
+- Admins can disable the feature globally via the GitWall admin panel (API → EnVault Sync)
+
+### GitWall store management
+
+Users manage their stores in GitWall at **Settings → EnVault Sync**:
+
+- Create named stores (up to 10 per user)
+- See current version, SHA-256 hash, and last-updated timestamp
+- Rotate store tokens
+- Delete stores
 
 ## `ev run` vs `ev load`
 
@@ -474,6 +552,8 @@ config/settings.py
 | Sessions | encrypted files in `~/.envault/sessions/` |
 | Web UI | local only on `127.0.0.1` |
 | Password handling | prompt only, never via CLI flags |
+| Cloud config | `~/.envault/cloud.json`, permissions `0600` |
+| Cloud upload | encrypted blob only — server is zero-knowledge |
 
 The master password is not stored by default. If you lose it, there is no recovery.
 

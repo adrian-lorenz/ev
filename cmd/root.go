@@ -145,11 +145,15 @@ func openVaultKeychain() (*vault.Vault, string, string, error) {
 
 // openVault prompts for the master password and opens (or creates) the vault.
 // If the vault is new, it asks to set a password with confirmation.
+// Before opening, it checks the cloud for newer data and pulls if available.
 func openVault() (*vault.Vault, string, string, error) {
 	path, err := resolveVaultPath()
 	if err != nil {
 		return nil, "", "", err
 	}
+
+	// Pull from cloud if configured (non-fatal – sync errors are printed to stderr)
+	vault.AutoPull(path)
 
 	var password string
 	if !vault.Exists(path) {

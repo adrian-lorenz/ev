@@ -85,6 +85,7 @@ func newImportCmd() *cobra.Command {
 				return err
 			}
 
+			vault.AutoPush(path)
 			// Refresh active session so ev run/load pick up the new secrets immediately
 			if err := vault.RefreshSession(project, v.GetAll(project)); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: could not refresh session: %v\n", err)

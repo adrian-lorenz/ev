@@ -50,6 +50,7 @@ func newSetCmd() *cobra.Command {
 				return err
 			}
 
+			vault.AutoPush(path)
 			_ = vault.RefreshSession(project, v.GetAll(project))
 			fmt.Fprintf(os.Stderr, "Set %s in project %q\n", key, project)
 			return nil

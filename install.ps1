@@ -1,16 +1,16 @@
-# install.ps1 — Download and install ev from GitHub Releases
+# install.ps1 — Download and install ev from git-wall.de
 #
 # Usage:
-#   iwr -useb https://raw.githubusercontent.com/adrian-lorenz/ev/main/install.ps1 | iex
+#   iwr -useb https://git-wall.de/noa-x/ev/raw/main/install.ps1 | iex
 #
 # Or with a custom install directory:
-#   $env:EV_INSTALL_DIR = "C:\tools"; iwr -useb .../install.ps1 | iex
+#   $env:EV_INSTALL_DIR = "C:\tools"; iwr -useb https://git-wall.de/noa-x/ev/raw/main/install.ps1 | iex
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$Repo      = "adrian-lorenz/ev"
-$Binary    = "ev.exe"
+$RepoBase   = "https://git-wall.de/noa-x/ev"
+$Binary     = "ev.exe"
 $InstallDir = if ($env:EV_INSTALL_DIR) { $env:EV_INSTALL_DIR } else { "$env:LOCALAPPDATA\ev" }
 
 function Info  ($msg) { Write-Host "  [+] $msg" -ForegroundColor Green }
@@ -35,18 +35,20 @@ Write-Host ""
 Write-Host "  Fetching latest release…"
 
 try {
-  $release = Invoke-RestMethod "https://api.github.com/repos/$Repo/releases/latest"
-  $version = $release.tag_name
+  $version = (Invoke-WebRequest -Uri "$RepoBase/releases/latest/tag" -UseBasicParsing).Content.Trim()
 } catch {
-  Fatal "Could not reach GitHub API. Check your internet connection."
+  Fatal "Could not reach git-wall.de. Check your internet connection."
+}
+if (-not $version) {
+  Fatal "Could not determine latest version. Set VERSION manually via `$env:EV_VERSION."
 }
 
 Info "Latest version: $version"
 
 # ── build URLs ───────────────────────────────
 $archive      = "ev_windows_${GoArch}.zip"
-$downloadUrl  = "https://github.com/$Repo/releases/download/$version/$archive"
-$checksumUrl  = "https://github.com/$Repo/releases/download/$version/checksums.txt"
+$downloadUrl  = "$RepoBase/releases/$version/assets/$archive"
+$checksumUrl  = "$RepoBase/releases/$version/assets/checksums.txt"
 
 # ── download ──────────────────────────────────
 Write-Host ""
